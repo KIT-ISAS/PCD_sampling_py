@@ -1,6 +1,5 @@
 import time
 import torch
-
 from src.models import PCDSamplingConfig
 from src.pcd_sampling import PCDSamplingStrategy
 from src.models import GaussianMixture
