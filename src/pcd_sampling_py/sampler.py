@@ -1,8 +1,8 @@
 from typing import Callable
 import torch
 from torch import Tensor
-from src.models import PCDSamplerConfig
-from src.sampling_utils import gm_cdf_1d, gm_pdf_1d, heaviside_mean, sample_gm, sample_gm_cached_cholesky
+from pcd_sampling_py.models import PCDSamplerConfig
+from pcd_sampling_py.sampling_utils import gm_cdf_1d, gm_pdf_1d, heaviside_mean, sample_gm, sample_gm_cached_cholesky
 
 class PCDSampler:
     """Projected Cumulative Distribution sampling."""

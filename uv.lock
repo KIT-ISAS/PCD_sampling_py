@@ -293,13 +293,13 @@ wheels = [
 [[package]]
 name = "pcd-sampling-py"
 version = "0.1.0"
-source = { virtual = "." }
+source = { editable = "." }
 dependencies = [
     { name = "torch" },
 ]
 
 [package.metadata]
-requires-dist = [{ name = "torch", specifier = ">=2.9.1" }]
+requires-dist = [{ name = "torch", specifier = ">=2.0" }]
 
 [[package]]
 name = "setuptools"
