@@ -1,8 +1,8 @@
 import time
 import torch
 
-from src.pcd_sampling.models import PCDSamplerConfig
-from src.pcd_sampling.sampler import PCDSampler
+from src.pcd_sampling_py.models import PCDSamplerConfig
+from src.pcd_sampling_py.sampler import PCDSampler
 
 """
 A simple example of a 2 D Gaussian mixture
