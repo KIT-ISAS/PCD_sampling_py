@@ -1,14 +1,13 @@
 from typing import Callable
 import torch
 from torch import Tensor
-from src.models import PCDSamplingConfig
-from src.sampling_utils import gm_cdf_1d, gm_pdf_1d, heaviside_mean, sample_gm_cached_cholesky
-from src.models import GaussianMixture
+from src.models import PCDSamplerConfig
+from src.sampling_utils import gm_cdf_1d, gm_pdf_1d, heaviside_mean, sample_gm, sample_gm_cached_cholesky
 
-class PCDSamplingStrategy:
+class PCDSampler:
     """Projected Cumulative Distribution sampling."""
 
-    def __init__(self, config: PCDSamplingConfig):
+    def __init__(self, config: PCDSamplerConfig):
         """
         :param self: Description
         :param dim: dimensions of the unit vectors (dimensions of what we sample from).
@@ -130,24 +129,24 @@ class PCDSamplingStrategy:
         delta_r_original.scatter_(dim=0, index=idx, src=delta_r_sorted)
 
         delta_x = (u[None, :] * delta_r_original[:, None]) / self.number_unit_vectors
-        return delta_x
+        return delta_x        
 
     @torch.compile
-    def sample(self, gm: GaussianMixture):
+    def sample(self, weights: Tensor, means: Tensor, covariances: Tensor):
         # 1. Create projections of the original GM onto the unit vectors.
 
         # GM projections must be of shape:
         # means: shape(K, L,) where K - number of unit vectors, L - number of components in a Gaussian
         # covariances: shape(K, L,)
 
-        projected_means = self.unit_vectors @ gm.means.T  # -> (K, L)
+        projected_means = self.unit_vectors @ means.T  # -> (K, L)
 
-        sigma2 = torch.einsum("kd,lde,ke->kl", self.unit_vectors, gm.covariances, self.unit_vectors)
+        sigma2 = torch.einsum("kd,lde,ke->kl", self.unit_vectors, covariances, self.unit_vectors)
         sigma2 = torch.clamp(sigma2, min=1e-3)
         projected_stds = torch.sqrt(sigma2)
 
-        # 2. Create some random starting samples from the provided GM (we use cached cholesky so that we dont need to do that several times in different rollouts)
-        X = sample_gm_cached_cholesky(gm.weights, gm.means, gm.cov_colesky, self.number_samples)
+        # 2. Create some random starting samples from the provided GM
+        X = sample_gm(weights, means, covariances, self.number_samples)
 
         # 3. Start the minimization loop
         for _ in range(self.steps):
@@ -158,7 +157,7 @@ class PCDSamplingStrategy:
 
             # Calculate the gain for the samples based on the differences between projections of real and approximate distributions
             delta_x: Tensor = self.compute_delta_x(
-                R, self.unit_vectors, projected_means, projected_stds, gm.weights
+                R, self.unit_vectors, projected_means, projected_stds, weights
             ).sum(
                 dim=0
             )  # -> (L, N)

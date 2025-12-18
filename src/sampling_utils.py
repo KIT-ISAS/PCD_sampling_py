@@ -88,7 +88,7 @@ def gm_cdf_1d(x: Tensor, weights: Tensor, means: Tensor, stds: Tensor):
 
 def heaviside_mean(x: Tensor, r: Tensor):
     """
-    Computes mean of heavisides for scalar x and vector r by comparing x with every element in r.
+    Computes mean of heavisides for scalar x and vector r by comparing x with every element
 
     :param x: scalar that has to be compared to every element in vector r.
     :param r: vector

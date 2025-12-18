@@ -18,18 +18,16 @@ In order to use PCD sampling in your project you must:
 ``` python
     torch.manual_seed(42) # for reproducibility
 
-    gm = GaussianMixture(
-        weights=torch.tensor([0.5, 0.5]),
-        means=torch.tensor([[0.0, 0.0], [0.0, 0.0]]),
-        covariances=torch.tensor([[[3.0, 2.8], [2.8, 3.0]], [[3.0, -2.8], [-2.8, 3.0]]]),
-    ) # Create a Gaussian mixture
+    # Create a Gaussian mixture parameters
+    weights=torch.tensor([0.5, 0.5])
+    means=torch.tensor([[0.0, 0.0], [0.0, 0.0]])
+    covariances=torch.tensor([[[3.0, 2.8], [2.8, 3.0]], [[3.0, -2.8], [-2.8, 3.0]]])
 
-    
     sampling_config = PCDSamplingConfig(number_samples=40, dim=2, number_unit_vectors=100, threshold=0.0001, steps=100, sorting=True) # Create a config
 
     sampler = PCDSamplingStrategy(sampling_config) # Inject config into the sampling class
 
-    samples = sampler.sample(gm) # Sample
+    samples = sampler.sample(weighs, means, covariances) # Sample
 ```
 
 ## Important
