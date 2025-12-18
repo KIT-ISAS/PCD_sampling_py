@@ -12,6 +12,8 @@ def sample_gm_cached_cholesky(
     """
     This function is used to sample from Gaussian Mixture without calculating cholesky decomposition (minor optimization)
 
+    Maybe for higher dimensional Covariances it makes sense (try it out)
+    
     :param weights: Weights of the components (T,)
     :param means: Means of the components (T, N)
     :param covs_cholesky: Precomputed Cholesky decomposition of the covariances (T, N, N)
