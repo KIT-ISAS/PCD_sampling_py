@@ -133,12 +133,8 @@ class PCDSampler:
 
     @torch.compile
     def sample(self, weights: Tensor, means: Tensor, covariances: Tensor):
+        
         # 1. Create projections of the original GM onto the unit vectors.
-
-        # GM projections must be of shape:
-        # means: shape(K, L,) where K - number of unit vectors, L - number of components in a Gaussian
-        # covariances: shape(K, L,)
-
         projected_means = self.unit_vectors @ means.T  # -> (K, L)
 
         sigma2 = torch.einsum("kd,lde,ke->kl", self.unit_vectors, covariances, self.unit_vectors)

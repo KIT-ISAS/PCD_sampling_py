@@ -7,7 +7,7 @@ def sample_gm_cached_cholesky(
     weights: Tensor,
     means: Tensor,
     covs_cholesky: Tensor,
-    number_samples: int = 40,
+    number_samples: int,
 ):
     """
     This function is used to sample from Gaussian Mixture without calculating cholesky decomposition (minor optimization)
@@ -41,7 +41,7 @@ def sample_gm(
     weights: Tensor,
     means: Tensor,
     covs: Tensor,
-    number_samples: int = 40,
+    number_samples: int,
 ):
     """
     This function is used to sample from Gaussian Mixture.
