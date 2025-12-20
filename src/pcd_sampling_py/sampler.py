@@ -207,10 +207,12 @@ class PCDSampler:
                 dim=0
             )  # -> (L, N)
 
-            if (
-                torch.norm(delta_x.sum()) < self.threshold
-            ):  # works better with sum() and then summing over a vector.
-                return X
+            
+            # For now i have commented it out, because control logic does not work in a vmap.
+            # if (
+            #     torch.norm(delta_x.sum()) < self.threshold
+            # ):  # works better with sum() and then summing over a vector.
+            #     return X
             X += coef * delta_x
 
         return X
