@@ -5,6 +5,19 @@ Original paper: https://ieeexplore.ieee.org/abstract/document/9086228
 ## Installation
 If you wish to use the lib in your project, run: uv add git+https://github.com/KIT-ISAS/PCD_sampling_py.git
 
+## Testing
+To run the tests, simply install test dependencies:
+
+```bash
+uv sync --extra test
+```
+
+and then run the tests with:
+
+``` bash
+uv run pytest
+```
+
 ## Usage
 
 In order to use PCD sampling in your project you must:

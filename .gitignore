@@ -1,1 +1,16 @@
+# Python-generated files
+__pycache__/
+*.py[oc]
+build/
+dist/
+wheels/
+*.egg-info
+
+# Virtual environments
 .venv
+
+# ignore pytest cache and coverage files
+.pytest_cache/
+htmlcov/
+.coverage
+coverage.*
