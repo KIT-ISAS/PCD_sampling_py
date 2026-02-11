@@ -1,0 +1,16 @@
+start_seed: 1
+end_seed: 10
+
+start_samples: 100
+end_samples: 5100
+step_samples: 200
+
+unit_vectors: 1000
+threshold: 0.0001
+dimension: 2
+components: 2
+
+device: cuda
+
+output_csv: "pcd_results_cuda_dim=2,comp=2,K=1000,threshold=0.0001.csv"
+output_png: "pcd_results_cuda_dim=2,comp=2,K=1000,threshold=0.0001.png"

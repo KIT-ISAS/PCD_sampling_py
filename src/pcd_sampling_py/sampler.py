@@ -255,9 +255,7 @@ class PCDSampler:
                 dim=0
             )  # -> (L, N)
 
-            if (
-                torch.norm(delta_x, dim=1).sum() < self.threshold
-            ):  # works better with sum() and then summing over a vector.
+            if torch.linalg.vector_norm(delta_x, dim=1).mean() < self.threshold:
                 return X
             X += coef * delta_x
 
