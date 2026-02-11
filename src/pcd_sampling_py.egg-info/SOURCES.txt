@@ -9,3 +9,4 @@ src/pcd_sampling_py.egg-info/SOURCES.txt
 src/pcd_sampling_py.egg-info/dependency_links.txt
 src/pcd_sampling_py.egg-info/requires.txt
 src/pcd_sampling_py.egg-info/top_level.txt
+tests/test_example.py
