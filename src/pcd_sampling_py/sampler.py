@@ -169,6 +169,7 @@ class PCDSampler:
     def sample(self, weights: Tensor, means: Tensor, covariances: Tensor):
         """
         Sample from the Gaussian Mixture. Returns a (L, N) tensor of samples.
+        Stop when the final steps is reachend. Can be used in a vmap.
 
         :param weights: (T,)
         :type weights: Tensor
@@ -207,12 +208,57 @@ class PCDSampler:
                 dim=0
             )  # -> (L, N)
 
+            X += coef * delta_x
+
+        return X
+
+    @torch.compile
+    def sample_threshold(self, weights: Tensor, means: Tensor, covariances: Tensor):
+        """
+        Sample from the Gaussian Mixture. Returns a (L, N) tensor of samples. Stop when threshold is reached
+        ATTENTION: Cannot be used in vmap.
             
-            # For now i have commented it out, because control logic does not work in a vmap.
-            # if (
-            #     torch.norm(delta_x.sum()) < self.threshold
-            # ):  # works better with sum() and then summing over a vector.
-            #     return X
+        :param weights: (T,)
+        :type weights: Tensor
+        :param means: (T, N)
+        :type means: Tensor
+        :param covariances: (T, N, N)
+        :type covariances: Tensor
+        """
+
+        # 1. Create projections of the original GM onto the unit vectors.
+        projected_means = self.unit_vectors @ means.T  # -> (K, L)
+
+        sigma2 = torch.einsum(
+            "kd,lde,ke->kl", self.unit_vectors, covariances, self.unit_vectors
+        )
+        sigma2 = torch.clamp(sigma2, min=1e-3)
+        projected_stds = torch.sqrt(sigma2)
+
+        # 2. Create some random starting samples from the provided GM
+        X = sample_gm(weights, means, covariances, self.number_samples)
+
+        # 3. Start the minimization loop
+        for _ in range(self.steps):
+            coef = (
+                self.alpha_min * _ / self.steps
+                + self.alpha_max * (self.steps - _) / self.steps
+            )
+
+            # Calculate projections onto unit vectors before hand
+            R = self.unit_vectors @ X.T  # -> (K, L)
+
+            # Calculate the gain for the samples based on the differences between projections of real and approximate distributions
+            delta_x: Tensor = self.compute_delta_x(
+                R, self.unit_vectors, projected_means, projected_stds, weights
+            ).sum(
+                dim=0
+            )  # -> (L, N)
+
+            if (
+                torch.norm(delta_x, dim=1).sum() < self.threshold
+            ):  # works better with sum() and then summing over a vector.
+                return X
             X += coef * delta_x
 
         return X

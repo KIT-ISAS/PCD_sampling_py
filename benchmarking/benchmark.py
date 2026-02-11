@@ -58,7 +58,7 @@ def sample_once(
         number_unit_vectors=sampler_cfg["unit_vectors"],
         number_samples=number_samples,
         threshold=sampler_cfg.get("threshold", 0.1),
-        steps=sampler_cfg.get("steps", 40),
+        steps=sampler_cfg.get("steps", 100),
         sorting=True,
     )
 
