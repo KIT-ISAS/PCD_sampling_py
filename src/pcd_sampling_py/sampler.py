@@ -165,6 +165,37 @@ class PCDSampler:
         delta_x = (u[None, :] * delta_r_original[:, None]) / self.number_unit_vectors
         return delta_x
 
+
+    def _calculate_gain(self, step, X, projected_means, projected_stds, weights):
+        coef = (
+            self.alpha_min * step / self.steps
+            + self.alpha_max * (self.steps - step) / self.steps
+        )
+
+        # Calculate projections onto unit vectors before hand
+        R = self.unit_vectors @ X.T  # -> (K, L)
+
+        # Calculate the gain for the samples based on the differences between projections of real and approximate distributions
+        delta_x: Tensor = self.compute_delta_x(
+            R, self.unit_vectors, projected_means, projected_stds, weights
+        ).sum(
+            dim=0
+        )  # -> (L, N)
+            
+        return coef, delta_x
+    
+    
+    def _calculate_projections(self, means, covariances):
+        projected_means = self.unit_vectors @ means.T  # -> (K, L)
+
+        sigma2 = torch.einsum(
+            "kd,lde,ke->kl", self.unit_vectors, covariances, self.unit_vectors
+        )
+        sigma2 = torch.clamp(sigma2, min=1e-3)
+        projected_stds = torch.sqrt(sigma2)
+        
+        return projected_means, projected_stds
+
     @torch.compile
     def sample(self, weights: Tensor, means: Tensor, covariances: Tensor):
         """
@@ -180,36 +211,16 @@ class PCDSampler:
         """
 
         # 1. Create projections of the original GM onto the unit vectors.
-        projected_means = self.unit_vectors @ means.T  # -> (K, L)
-
-        sigma2 = torch.einsum(
-            "kd,lde,ke->kl", self.unit_vectors, covariances, self.unit_vectors
-        )
-        sigma2 = torch.clamp(sigma2, min=1e-3)
-        projected_stds = torch.sqrt(sigma2)
+        projected_means, projected_stds = self._calculate_projections(means, covariances)
 
         # 2. Create some random starting samples from the provided GM
         X = sample_gm(weights, means, covariances, self.number_samples)
 
         # 3. Start the minimization loop
         for _ in range(self.steps):
-            coef = (
-                self.alpha_min * _ / self.steps
-                + self.alpha_max * (self.steps - _) / self.steps
-            )
-
-            # Calculate projections onto unit vectors before hand
-            R = self.unit_vectors @ X.T  # -> (K, L)
-
-            # Calculate the gain for the samples based on the differences between projections of real and approximate distributions
-            delta_x: Tensor = self.compute_delta_x(
-                R, self.unit_vectors, projected_means, projected_stds, weights
-            ).sum(
-                dim=0
-            )  # -> (L, N)
-
-            X += coef * delta_x
-
+        
+            coef, delta_x = self._calculate_gain(_, X, projected_means, projected_stds, weights)
+            X = coef * delta_x
         return X
 
     @torch.compile
@@ -227,36 +238,37 @@ class PCDSampler:
         """
 
         # 1. Create projections of the original GM onto the unit vectors.
-        projected_means = self.unit_vectors @ means.T  # -> (K, L)
-
-        sigma2 = torch.einsum(
-            "kd,lde,ke->kl", self.unit_vectors, covariances, self.unit_vectors
-        )
-        sigma2 = torch.clamp(sigma2, min=1e-3)
-        projected_stds = torch.sqrt(sigma2)
+        projected_means, projected_stds = self._calculate_projections(means, covariances)
 
         # 2. Create some random starting samples from the provided GM
         X = sample_gm(weights, means, covariances, self.number_samples)
 
         # 3. Start the minimization loop
         for _ in range(self.steps):
-            coef = (
-                self.alpha_min * _ / self.steps
-                + self.alpha_max * (self.steps - _) / self.steps
-            )
-
-            # Calculate projections onto unit vectors before hand
-            R = self.unit_vectors @ X.T  # -> (K, L)
-
-            # Calculate the gain for the samples based on the differences between projections of real and approximate distributions
-            delta_x: Tensor = self.compute_delta_x(
-                R, self.unit_vectors, projected_means, projected_stds, weights
-            ).sum(
-                dim=0
-            )  # -> (L, N)
+            
+            coef, delta_x = self._calculate_gain(_, X, projected_means, projected_stds, weights)
+            X += coef * delta_x
 
             if torch.linalg.vector_norm(delta_x, dim=1).mean() < self.threshold:
                 return X
-            X += coef * delta_x
-
+            
         return X
+    
+    def benchmark_steps(self, weights: Tensor, means: Tensor, covariances: Tensor):
+        # 1. Create projections of the original GM onto the unit vectors.
+        projected_means, projected_stds = self._calculate_projections(means, covariances)
+
+        # 2. Create some random starting samples from the provided GM
+        X = sample_gm(weights, means, covariances, self.number_samples)
+
+        # Create array of norms
+        norms = torch.empty((self.steps))
+        
+        # 3. Start the minimization loop
+        for _ in range(self.steps):
+            
+            coef, delta_x = self._calculate_gain(_, X, projected_means, projected_stds, weights)
+            X += coef * delta_x
+            norms[_] = torch.linalg.vector_norm(delta_x, dim=1).mean()
+            
+        return norms
