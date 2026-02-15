@@ -46,6 +46,8 @@ def maybe_synchronize(device: torch.device) -> None:
 
 def sample_once(
     number_samples: int,
+    number_proj: int,
+    dim: int,
     seed: int,
     sampler_cfg: Dict,
     gm: Tuple[torch.Tensor, torch.Tensor, torch.Tensor],
@@ -54,8 +56,8 @@ def sample_once(
     torch.manual_seed(seed)
 
     config = PCDSamplerConfig(
-        dim=sampler_cfg["dimension"],
-        number_unit_vectors=sampler_cfg["unit_vectors"],
+        dim=dim,
+        number_unit_vectors=number_proj,
         number_samples=number_samples,
         threshold=sampler_cfg.get("threshold", 0.1),
         steps=sampler_cfg.get("steps", 100),
@@ -76,24 +78,53 @@ def sample_once(
     return time.perf_counter() - start
 
 
+# def run_benchmark(cfg: Dict) -> Tuple[Sequence[int], Sequence[int], List[List[float]]]:
+#     device = ensure_device(cfg.get("device", "cpu"))
+#     seeds = list(range(cfg["start_seed"], cfg["end_seed"] + 1))
+#     sample_counts = list(range(cfg["start_samples"], cfg["end_samples"] + 1, cfg["step_samples"]))
+#     dimensions = list(range(cfg["start_dimensions"], cfg["end_dimensions"] + 1, cfg["step_dimensions"]))
+#     components = list(range(cfg["start_components"], cfg["end_components"] + 1, cfg["step_components"]))
+#     projections = list(range(cfg["start_projections"], cfg["end_projections"] + 1, cfg["step_projections"]))
+
+
+#     all_times: List[List[float]] = []
+#     for dim in dimensions:
+#         for n_comps in components:
+#             gm = build_gaussian_mixture(dim, n_comps, device)
+#             for n_samples in sample_counts:
+#                 for n_proj in projections:
+#                     seed_times: List[float] = []
+#                     for seed in seeds:
+#                         elapsed = sample_once(n_samples, n_proj, dim, seed, cfg, gm, device)
+#                         seed_times.append(elapsed)
+#                         print(f"dim={dim}, comps={n_comps}, samples={n_samples}, projs={n_proj}, seed={seed}, elapsed={elapsed:.6f}s")
+#                     all_times.append([n_samples, n_comps, dim, n_proj] + seed_times)
+
+#     return sample_counts, seeds, all_times
+
 def run_benchmark(cfg: Dict) -> Tuple[Sequence[int], Sequence[int], List[List[float]]]:
     device = ensure_device(cfg.get("device", "cpu"))
     seeds = list(range(cfg["start_seed"], cfg["end_seed"] + 1))
-    sample_counts = list(range(cfg["start_samples"], cfg["end_samples"] + 1, cfg["step_samples"]))
+    sample_counts = list(cfg["samples"])
+    dimensions = list( cfg["dimensions"])
+    components = list(cfg["components"])
+    projections = list(cfg["projections"])
 
-    gm = build_gaussian_mixture(cfg["dimension"], cfg["components"], device)
 
     all_times: List[List[float]] = []
-    for n_samples in sample_counts:
-        seed_times: List[float] = []
-        for seed in seeds:
-            elapsed = sample_once(n_samples, seed, cfg, gm, device)
-            seed_times.append(elapsed)
-            print(f"samples={n_samples}, seed={seed}, elapsed={elapsed:.6f}s")
-        all_times.append(seed_times)
+    for dim in dimensions:
+        for n_comps in components:
+            gm = build_gaussian_mixture(dim, n_comps, device)
+            for n_samples in sample_counts:
+                for n_proj in projections:
+                    seed_times: List[float] = []
+                    for seed in seeds:
+                        elapsed = sample_once(n_samples, n_proj, dim, seed, cfg, gm, device)
+                        seed_times.append(elapsed)
+                        print(f"dim={dim}, comps={n_comps}, samples={n_samples}, projs={n_proj}, seed={seed}, elapsed={elapsed:.6f}s")
+                    all_times.append([n_samples, n_comps, dim, n_proj] + seed_times)
 
     return sample_counts, seeds, all_times
-
 
 def save_csv(sample_counts: Sequence[int], seeds: Sequence[int], times: List[List[float]], output_path: Path) -> None:
     output_path.parent.mkdir(parents=True, exist_ok=True)
@@ -103,6 +134,16 @@ def save_csv(sample_counts: Sequence[int], seeds: Sequence[int], times: List[Lis
         writer.writerow(header)
         for n, row in zip(sample_counts, times):
             writer.writerow([n] + row)
+    print(f"Saved CSV to {output_path}")
+
+def save_csv2(seeds, times: List[List[float]], output_path: Path) -> None:
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    header = ["num_samples", "num_components", "dim", "num_projections"] + [f"seed_{seed}_time" for seed in seeds]
+    with output_path.open("w", newline="") as f:
+        writer = csv.writer(f)
+        writer.writerow(header)
+        for row in times:
+            writer.writerow(row)
     print(f"Saved CSV to {output_path}")
 
 
@@ -163,8 +204,9 @@ def main() -> None:
     with torch.no_grad():
         sample_counts, seeds, times = run_benchmark(cfg)
 
-    save_csv(sample_counts, seeds, times, csv_path)
-    plot_results(sample_counts, times, png_path)
+    # save_csv(sample_counts, seeds, times, csv_path)
+    save_csv2(seeds, times, csv_path)
+    # plot_results(sample_counts, times, png_path)
 
 
 if __name__ == "__main__":

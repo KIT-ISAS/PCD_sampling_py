@@ -1,0 +1,25 @@
+start_seed: 1
+end_seed: 10
+
+start_samples: 100
+end_samples: 5100
+step_samples: 1000
+
+start_components: 2
+end_components: 110
+step_components: 20
+
+start_projections: 100
+end_projections: 1100
+step_projections: 300
+
+start_dimensions: 2
+end_dimensions: 10
+step_dimensions: 2
+
+steps: 100
+
+device: cuda
+
+output_csv: "pcd_results_cuda_steps=100.csv"
+output_png: "pcd_results_cuda_steps=100.png"

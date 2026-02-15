@@ -1,0 +1,18 @@
+start_seed: 1
+end_seed: 10
+
+samples: [100, 200, 500, 1000]
+components: [2, 10, 20, 50]
+projections: [100, 500]
+dimensions: [2, 4, 6, 8, 10]
+# samples: [100, 200]
+# components: [2]
+# projections: [100]
+# dimensions: [2]
+
+steps: 100
+
+device: cpu
+
+output_csv: "pcd_results_cpu_steps=100.csv"
+output_png: "pcd_results_cpu_steps=100.png"
