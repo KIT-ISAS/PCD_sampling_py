@@ -220,7 +220,7 @@ class PCDSampler:
         for _ in range(self.steps):
         
             coef, delta_x = self._calculate_gain(_, X, projected_means, projected_stds, weights)
-            X = coef * delta_x
+            X += coef * delta_x
         return X
 
     @torch.compile
