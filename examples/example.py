@@ -15,19 +15,23 @@ def sample():
     weights = torch.tensor([0.5, 0.5])
     means = torch.tensor([[0.0, 0.0], [0.0, 0.0]])
     covariances = torch.tensor([[[3.0, 2.8], [2.8, 3.0]], [[3.0, -2.8], [-2.8, 3.0]]])
+    # weights = torch.tensor([1.])
+    # means = torch.tensor([[0.0, 0.0]])
+    # covariances = torch.tensor([[[3.0, 2.8], [2.8, 3.0]]])
+    
     torch.manual_seed(42)
 
     sum_time = 0.0
     last_samples = None
 
     sampling_config = PCDSamplerConfig(
-        number_samples=40,
+        number_samples=2,
         dim=2,
         number_unit_vectors=1000,
-        steps=100,
+        steps=0,
         sorting=True,
+        mean_sampling=False
     )
-    print("test")
     sampler = PCDSampler(sampling_config)
 
     for i in range(1):
