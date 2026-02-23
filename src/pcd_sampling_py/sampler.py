@@ -280,7 +280,7 @@ class PCDSampler:
         )
 
         # 2. Create some random starting samples from the provided GM
-        X = sample_gm(weights, means, covariances, self.number_samples)
+        X = self._initial_samples(weights, means, covariances)
 
         # Create array of norms
         norms = torch.empty((self.steps))
