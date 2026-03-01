@@ -70,10 +70,7 @@ def sample_once(
     sampler.sample(weights, means, covariances)
     
     start = time.perf_counter()
-    if "threshold" in sampler_cfg and hasattr(sampler, "sample_threshold"):
-        _ = sampler.sample_threshold(weights, means, covariances)
-    else:
-        _ = sampler.sample(weights, means, covariances)
+    _ = sampler.sample(weights, means, covariances)
     maybe_synchronize(device)
     return time.perf_counter() - start
 
@@ -102,7 +99,7 @@ def sample_once(
 
 #     return sample_counts, seeds, all_times
 
-def run_benchmark(cfg: Dict) -> Tuple[Sequence[int], Sequence[int], List[List[float]]]:
+def run_benchmark(cfg: Dict, output_path: Path) -> Tuple[Sequence[int], Sequence[int], List[List[float]]]:
     device = ensure_device(cfg.get("device", "cpu"))
     seeds = list(range(cfg["start_seed"], cfg["end_seed"] + 1))
     sample_counts = list(cfg["samples"])
@@ -110,8 +107,14 @@ def run_benchmark(cfg: Dict) -> Tuple[Sequence[int], Sequence[int], List[List[fl
     components = list(cfg["components"])
     projections = list(cfg["projections"])
 
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    header = ["num_samples", "num_components", "dim", "num_projections"] + [f"seed_{seed}_time" for seed in seeds]
+    
+    with output_path.open("w", newline="") as f:
+        writer = csv.writer(f)
+        writer.writerow(header)
 
-    all_times: List[List[float]] = []
+
     for dim in dimensions:
         for n_comps in components:
             gm = build_gaussian_mixture(dim, n_comps, device)
@@ -119,12 +122,18 @@ def run_benchmark(cfg: Dict) -> Tuple[Sequence[int], Sequence[int], List[List[fl
                 for n_proj in projections:
                     seed_times: List[float] = []
                     for seed in seeds:
-                        elapsed = sample_once(n_samples, n_proj, dim, seed, cfg, gm, device)
+                        try:
+                            elapsed = sample_once(n_samples, n_proj, dim, seed, cfg, gm, device)
+                        except:
+                            elapsed = -1.0
                         seed_times.append(elapsed)
                         print(f"dim={dim}, comps={n_comps}, samples={n_samples}, projs={n_proj}, seed={seed}, elapsed={elapsed:.6f}s")
-                    all_times.append([n_samples, n_comps, dim, n_proj] + seed_times)
-
-    return sample_counts, seeds, all_times
+                        if sum(seed_times) > 30.0:
+                            break
+                    with output_path.open("a", newline="") as f:
+                        writer = csv.writer(f)
+                        writer.writerow([n_samples, n_comps, dim, n_proj] + seed_times)
+    return sample_counts, seeds
 
 def save_csv(sample_counts: Sequence[int], seeds: Sequence[int], times: List[List[float]], output_path: Path) -> None:
     output_path.parent.mkdir(parents=True, exist_ok=True)
@@ -202,10 +211,10 @@ def main() -> None:
     png_path = output_dir / cfg["output_png"]
 
     with torch.no_grad():
-        sample_counts, seeds, times = run_benchmark(cfg)
+        sample_counts, seeds = run_benchmark(cfg, csv_path)
 
     # save_csv(sample_counts, seeds, times, csv_path)
-    save_csv2(seeds, times, csv_path)
+    # save_csv2(seeds, times, csv_path)
     # plot_results(sample_counts, times, png_path)
 
 
