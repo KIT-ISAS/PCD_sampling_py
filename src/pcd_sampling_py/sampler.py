@@ -154,15 +154,12 @@ class PCDSampler:
         """
 
         sorted_r, idx = torch.sort(r)
-
         delta_r_sorted = self._delta_r_sorted_vmap(
             sorted_r, self.numbers, weights, means, stds
         )
 
-        delta_r_original = torch.empty_like(delta_r_sorted)
-
-        delta_r_original.scatter_(dim=0, index=idx, src=delta_r_sorted)
-
+        # Returning to the original order
+        delta_r_original = delta_r_sorted[torch.argsort(idx)]
         delta_x = (u[None, :] * delta_r_original[:, None]) / self.number_unit_vectors
         return delta_x
 

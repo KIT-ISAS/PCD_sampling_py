@@ -15,26 +15,30 @@ def sample():
     weights = torch.tensor([0.5, 0.5])
     means = torch.tensor([[0.0, 0.0], [0.0, 0.0]])
     covariances = torch.tensor([[[3.0, 2.8], [2.8, 3.0]], [[3.0, -2.8], [-2.8, 3.0]]])
+    # weights = torch.tensor([0.2, 0.2, 0.2, 0.2, 0.2])
+    # means = torch.tensor([[0.0, 0.0], [0.0, 0.0], [1.0, 1.0], [-1.0, -1.0], [1.0, -1.0]])
+    # covariances = torch.tensor([[[3.0, 2.8], [2.8, 3.0]], [[3.0, -2.8], [-2.8, 3.0]], [[3.0, 0.0], [0.0, 3.0]], [[3.0, 0.0], [0.0, 3.0]], [[3.0, 0.0], [0.0, 3.0]]])
     # weights = torch.tensor([1.])
     # means = torch.tensor([[0.0, 0.0]])
     # covariances = torch.tensor([[[3.0, 2.8], [2.8, 3.0]]])
     
-    torch.manual_seed(42)
+    torch.manual_seed(10)
 
     sum_time = 0.0
     last_samples = None
 
     sampling_config = PCDSamplerConfig(
-        number_samples=2,
+        number_samples=10,
         dim=2,
         number_unit_vectors=1000,
-        steps=0,
+        steps=100,
+        # threshold=1e-6,
         sorting=True,
         mean_sampling=False
     )
     sampler = PCDSampler(sampling_config)
 
-    for i in range(1):
+    for i in range(5):
         print(f"Sampling step {i}")
         start = time.time()
         X = sampler.sample(weights, means, covariances)
@@ -152,6 +156,6 @@ def plot_gaussian_mixture_and_samples(
     plt.close()
 
 if __name__ == "__main__":
-    # torch.set_default_device("cuda")
+    torch.set_default_device("cuda")
     with torch.no_grad():
         sample()
