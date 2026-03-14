@@ -6,8 +6,11 @@ from pcd_sampling_py.sampling_utils import (
     gm_cdf_1d,
     gm_pdf_1d,
     heaviside_mean,
+    reduce_gm,
     sample_gm,
     sample_gm_cached_cholesky,
+    sample_ut,
+    sot_sphere,
 )
 
 
@@ -28,7 +31,14 @@ class PCDSampler:
         self.dim = config.dim
         self.steps = config.steps
         self.sorting = config.sorting
-        self.mean_sampling = config.mean_sampling
+        self.initial_sampling_method = config.initial_sampling_method
+        self.unit_vectors_method = config.unit_vectors_method
+        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        
+        if self.initial_sampling_method == "ut":
+            assert (
+                self.number_samples == self.dim * 2 + 1
+            ), "UT sampling requires 2 * N + 1 samples."
 
         self.alpha_max = 2
         self.alpha_min = 0.01
@@ -57,7 +67,11 @@ class PCDSampler:
 
         # Pre-allocate unit vectors, so that we don't calculate them in every step.
         # This can also be done deterministicaly with vectors uniformally covering the unit sphere. #TODO: later
-        self.create_unit_vectors_random()
+        
+        if self.unit_vectors_method == "random":
+            self.create_unit_vectors_random()
+        elif self.unit_vectors_method == "deterministic":
+            self.create_unit_vectors_deterministic()
 
     def create_unit_vectors_random(self):
         """
@@ -71,7 +85,13 @@ class PCDSampler:
             dim=1, keepdim=True
         )
 
-    def create_unit_vectors_deterministic(self): ...
+    def create_unit_vectors_deterministic(self):
+        """
+        Creates unit vectors to project the distribution onto with a deterministic method, so that they cover the unit sphere uniformly.
+        """
+
+        self.unit_vectors = sot_sphere(
+            self.number_unit_vectors, d=self.dim, K=64, iterations=300, device=self.device)
 
     @torch.compile
     def calculate_delta_r(
@@ -193,13 +213,19 @@ class PCDSampler:
         return projected_means, projected_stds
 
     def _initial_samples(self, weights: Tensor, means: Tensor, covariances: Tensor):
-        if self.mean_sampling:
+        if self.initial_sampling_method == "mean":
             # We just iterate through means and get samples.
             K = means.shape[0]
             N = self.number_samples
 
             idx = torch.arange(N, device=means.device) % K  # (N,)
             samples = means[idx]  # (N, d)
+            return samples
+
+        elif self.initial_sampling_method == "ut":
+            # We use the unscented transform to get the initial samples.
+            reduced_mean, reduced_cov = reduce_gm(weights, means, covariances)
+            samples = sample_ut(reduced_mean, reduced_cov)
             return samples
 
         return sample_gm(weights, means, covariances, self.number_samples)

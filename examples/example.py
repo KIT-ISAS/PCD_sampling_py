@@ -3,6 +3,7 @@ import time
 import torch
 import matplotlib.pyplot as plt
 
+from pcd_sampling_py import sampler
 from pcd_sampling_py.models import PCDSamplerConfig
 from pcd_sampling_py.sampler import PCDSampler
 
@@ -13,7 +14,7 @@ A simple example of a 2 D Gaussian mixture
 
 def sample():
     weights = torch.tensor([0.5, 0.5])
-    means = torch.tensor([[0.0, 0.0], [0.0, 0.0]])
+    means = torch.tensor([[2.0, 0.0], [-2.0, 0.0]])
     covariances = torch.tensor([[[3.0, 2.8], [2.8, 3.0]], [[3.0, -2.8], [-2.8, 3.0]]])
     # weights = torch.tensor([0.2, 0.2, 0.2, 0.2, 0.2])
     # means = torch.tensor([[0.0, 0.0], [0.0, 0.0], [1.0, 1.0], [-1.0, -1.0], [1.0, -1.0]])
@@ -21,20 +22,21 @@ def sample():
     # weights = torch.tensor([1.])
     # means = torch.tensor([[0.0, 0.0]])
     # covariances = torch.tensor([[[3.0, 2.8], [2.8, 3.0]]])
-    
+
     torch.manual_seed(10)
 
     sum_time = 0.0
     last_samples = None
 
     sampling_config = PCDSamplerConfig(
-        number_samples=10,
+        number_samples=5,
         dim=2,
-        number_unit_vectors=1000,
-        steps=100,
+        number_unit_vectors=10,
+        steps=3,
         # threshold=1e-6,
         sorting=True,
-        mean_sampling=False
+        initial_sampling_method="random",
+        unit_vectors_method="deterministic",
     )
     sampler = PCDSampler(sampling_config)
 
@@ -50,6 +52,9 @@ def sample():
         print(f"Step {i}, elapsed: {diff}")
     print(f"Total no comp: {sum_time}")
 
+    vectors = sampler.unit_vectors.detach().cpu().numpy()
+    for v in vectors:
+        plt.plot([0, v[0]], [0, v[1]], color="red", alpha=0.3, linewidth=0.8)
     if last_samples is not None:
         plot_gaussian_mixture_and_samples(
             weights,
@@ -59,6 +64,7 @@ def sample():
             grid_size=200,
             save_paths=["examples/gm_samples.png", "examples/result.png"],
             show=False,
+            vectors=vectors,
         )
         print("Saved plots to examples/gm_samples.png and examples/result.png")
 
@@ -71,6 +77,7 @@ def plot_gaussian_mixture_and_samples(
     grid_size: int = 150,
     save_paths: list[str] | None = None,
     show: bool = False,
+    vectors: torch.Tensor | None = None,
 ):
     """Plot a 2D Gaussian mixture density and sample locations.
 
@@ -120,9 +127,24 @@ def plot_gaussian_mixture_and_samples(
 
     plt.figure(figsize=(8, 6))
     contour = plt.contourf(xx_cpu, yy_cpu, density, levels=30, cmap="Blues", alpha=0.85)
-    plt.contour(xx_cpu, yy_cpu, density, levels=10, colors="black", linewidths=0.6, alpha=0.4)
+    plt.contour(
+        xx_cpu, yy_cpu, density, levels=10, colors="black", linewidths=0.6, alpha=0.4
+    )
     plt.colorbar(contour, label="Density")
 
+    plt.scatter(
+        samples_cpu[:, 0],
+        samples_cpu[:, 1],
+        c="white",
+        s=40,
+        label="Samples",
+        edgecolors="black",
+        linewidths=0.6,
+    )
+    # for v in vectors:
+    #     plt.plot([0, v[0]], [0, v[1]], color="red", alpha=0.3, linewidth=0.8)
+
+    # Samples
     plt.scatter(
         samples_cpu[:, 0],
         samples_cpu[:, 1],
@@ -154,6 +176,7 @@ def plot_gaussian_mixture_and_samples(
     if show:
         plt.show()
     plt.close()
+
 
 if __name__ == "__main__":
     torch.set_default_device("cuda")

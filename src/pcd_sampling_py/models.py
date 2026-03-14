@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+from typing import Literal
 
 
 @dataclass
@@ -13,6 +14,8 @@ class PCDSamplerConfig:
     threshold: float = 0.1
     steps: int = 40
     sorting: bool = True
-    # This field means that the initial samples are means of the GM.
-    # This is useful for sampling MPC, where we have 1 Gaussian Component per sample
-    mean_sampling: bool = False
+   
+    # We can take initial samples by the mean or with ut so that they converge faster to desired distribution.
+    initial_sampling_method: Literal["mean", "random", "ut"] = "random"
+    # Take lcd for better unit sphere coverage (Overhead for the very first sample call)
+    unit_vectors_method: Literal["random", "deterministic"] = "random"
