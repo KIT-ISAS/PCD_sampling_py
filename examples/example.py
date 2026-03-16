@@ -3,6 +3,7 @@ import time
 import torch
 import matplotlib.pyplot as plt
 
+from benchmarking.cvm import sample_unit_vectors
 from pcd_sampling_py import sampler
 from pcd_sampling_py.models import PCDSamplerConfig
 from pcd_sampling_py.sampler import PCDSampler
@@ -24,25 +25,38 @@ def sample():
     # covariances = torch.tensor([[[3.0, 2.8], [2.8, 3.0]]])
 
     torch.manual_seed(10)
+    unit_vectors = sample_unit_vectors(10, 2, device=means.device, dtype=means.dtype).double()
 
     sum_time = 0.0
     last_samples = None
 
-    sampling_config = PCDSamplerConfig(
-        number_samples=5,
-        dim=2,
-        number_unit_vectors=20,
-        steps=2,
-        # threshold=1e-6,
-        sorting=True,
-        initial_sampling_method="mean",
-        unit_vectors_method="deterministic",
-    )
-    sampler = PCDSampler(sampling_config)
+    # sampling_config = PCDSamplerConfig(
+    #     number_samples=5,
+    #     dim=2,
+    #     number_unit_vectors=2000,
+    #     steps=28,
+    #     # threshold=1e-6,
+    #     sorting=True,
+    #     initial_sampling_method="random",
+    #     unit_vectors_method="random",
+    # )
+    # sampler = PCDSampler(sampling_config)
 
-    for i in range(5):
+    for i in range(13):
         print(f"Sampling step {i}")
         start = time.time()
+        sampling_config = PCDSamplerConfig(
+            number_samples=5,
+            dim=2,
+            number_unit_vectors=2000,
+            steps=i,
+            # threshold=1e-6,
+            sorting=True,
+            initial_sampling_method="random",
+            unit_vectors_method="random",
+        )
+        sampler = PCDSampler(sampling_config)
+
         X = sampler.sample(weights, means, covariances)
         last_samples = X
         diff = time.time() - start
@@ -52,6 +66,8 @@ def sample():
         print(f"Step {i}, elapsed: {diff}")
     print(f"Total no comp: {sum_time}")
 
+    # last_samples = sampler.sample(weights, means, covariances)
+    
     vectors = sampler.unit_vectors.detach().cpu().numpy()
     for v in vectors:
         plt.plot([0, v[0]], [0, v[1]], color="red", alpha=0.3, linewidth=0.8)

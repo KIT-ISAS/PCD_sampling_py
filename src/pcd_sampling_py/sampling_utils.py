@@ -171,7 +171,9 @@ def sample_ut(mean: torch.Tensor, covariance: torch.Tensor) -> torch.Tensor:
     return sigma_points
 
 
-def sample_sot_unit_vectors(number_unit_vectors: int, dim: int, device: torch.device) -> torch.Tensor:
+def sample_sot_unit_vectors(
+    number_unit_vectors: int, dim: int, device: torch.device
+) -> torch.Tensor:
     """
     Sample unit vectors uniformly on the unit sphere using Spherical Optimal Transport (SOT).
 
@@ -188,15 +190,17 @@ def sample_sot_unit_vectors(number_unit_vectors: int, dim: int, device: torch.de
 
     return unit_vectors
 
+
 def sample_random_sphere(n: int, d: int = 3, device: str = "cpu") -> torch.Tensor:
     """Random uniform points on S^{d-1}."""
     pts = torch.randn(n, d, device=device)
     return pts / pts.norm(dim=1, keepdim=True)
 
+
 def sot_step(points: torch.Tensor, K: int) -> torch.Tensor:
     """
     One SOT iteration on the sphere.
- 
+
     For each of K random directions:
       1. Project all points onto that direction (dot product)
       2. Sort projections (= 1D optimal transport)
@@ -204,7 +208,7 @@ def sot_step(points: torch.Tensor, K: int) -> torch.Tensor:
          density (Gaussian -> normalize -> project = same 1D marginal)
          and sorting those too
       4. Nudge each point toward its matched target along that direction
- 
+
     Instead of an inverse-CDF table, we just draw n fresh samples from
     the *same* distribution (uniform on sphere), project them onto theta,
     and sort. The sorted projections of a large uniform sample converge
@@ -213,31 +217,31 @@ def sot_step(points: torch.Tensor, K: int) -> torch.Tensor:
     """
     n, d = points.shape
     displacements = torch.zeros_like(points)
- 
+
     for _ in range(K):
         # Random slice direction
         theta = torch.randn(d, device=points.device)
         theta = theta / theta.norm()
- 
+
         # Project current points onto theta
-        proj = points @ theta                          # (n,)
+        proj = points @ theta  # (n,)
         order = torch.argsort(proj)
- 
+
         # Target: project n fresh uniform-sphere samples onto theta, sort them
         # This gives us the empirical quantiles of the 1D projected density
         target_pts = torch.randn(n, d, device=points.device)
         target_pts = target_pts / target_pts.norm(dim=1, keepdim=True)
         target_proj = (target_pts @ theta).sort().values
- 
+
         # Displacement along theta
-        d_ij = target_proj - proj[order]               # (n,)
+        d_ij = target_proj - proj[order]  # (n,)
         displacements[order] += d_ij.unsqueeze(1) * theta.unsqueeze(0) / K
- 
+
     # Apply and re-project onto sphere
     points_new = points + displacements
     return points_new / points_new.norm(dim=1, keepdim=True)
- 
- 
+
+
 def sot_sphere(
     n_points: int,
     d: int = 3,
