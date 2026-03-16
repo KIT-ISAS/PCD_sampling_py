@@ -31,11 +31,11 @@ def sample():
     sampling_config = PCDSamplerConfig(
         number_samples=5,
         dim=2,
-        number_unit_vectors=10,
-        steps=3,
+        number_unit_vectors=20,
+        steps=2,
         # threshold=1e-6,
         sorting=True,
-        initial_sampling_method="random",
+        initial_sampling_method="mean",
         unit_vectors_method="deterministic",
     )
     sampler = PCDSampler(sampling_config)

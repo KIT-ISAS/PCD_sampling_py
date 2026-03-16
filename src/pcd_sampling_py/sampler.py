@@ -34,7 +34,7 @@ class PCDSampler:
         self.initial_sampling_method = config.initial_sampling_method
         self.unit_vectors_method = config.unit_vectors_method
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-        
+
         if self.initial_sampling_method == "ut":
             assert (
                 self.number_samples == self.dim * 2 + 1
@@ -67,7 +67,7 @@ class PCDSampler:
 
         # Pre-allocate unit vectors, so that we don't calculate them in every step.
         # This can also be done deterministicaly with vectors uniformally covering the unit sphere. #TODO: later
-        
+
         if self.unit_vectors_method == "random":
             self.create_unit_vectors_random()
         elif self.unit_vectors_method == "deterministic":
@@ -91,7 +91,12 @@ class PCDSampler:
         """
 
         self.unit_vectors = sot_sphere(
-            self.number_unit_vectors, d=self.dim, K=64, iterations=300, device=self.device)
+            self.number_unit_vectors,
+            d=self.dim,
+            K=64,
+            iterations=300,
+            device=self.device,
+        )
 
     @torch.compile
     def calculate_delta_r(
@@ -214,12 +219,20 @@ class PCDSampler:
 
     def _initial_samples(self, weights: Tensor, means: Tensor, covariances: Tensor):
         if self.initial_sampling_method == "mean":
-            # We just iterate through means and get samples.
-            K = means.shape[0]
-            N = self.number_samples
+            # Choose random means as initial samples. A mean can only be chose once, no repetition.
+            n_means = means.shape[0]
+            n_samples = self.number_samples
 
-            idx = torch.arange(N, device=means.device) % K  # (N,)
-            samples = means[idx]  # (N, d)
+            assert n_means > 0, "means must contain at least one component"
+
+            # random order of means
+            perm = torch.randperm(n_means, device=means.device)
+
+            # repeat the permutation enough times and cut to desired length
+            reps = (n_samples + n_means - 1) // n_means   # ceil(n_samples / n_means)
+            indices = perm.repeat(reps)[:n_samples]
+
+            samples = means[indices]
             return samples
 
         elif self.initial_sampling_method == "ut":
@@ -227,8 +240,12 @@ class PCDSampler:
             reduced_mean, reduced_cov = reduce_gm(weights, means, covariances)
             samples = sample_ut(reduced_mean, reduced_cov)
             return samples
-
-        return sample_gm(weights, means, covariances, self.number_samples)
+        elif self.initial_sampling_method == "random":
+            return sample_gm(weights, means, covariances, self.number_samples)
+        else:
+            raise ValueError(
+                f"Invalid initial sampling method: {self.initial_sampling_method}"
+            )
 
     @torch.compile
     def sample(self, weights: Tensor, means: Tensor, covariances: Tensor):
