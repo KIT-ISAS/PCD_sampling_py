@@ -15,6 +15,7 @@ from pcd_sampling_py.sampling_utils import sot_sphere
 UNIT_VECTORS = 50
 STEPS = 30
 SEEDS = 40
+SAMPLES = 2
 
 
 def plot_convergence(all_distances: list, gt: float):
@@ -95,7 +96,7 @@ def calc_cvms_for_seed(
     for i in range(STEPS):
 
         sampling_config = PCDSamplerConfig(
-            number_samples=5,
+            number_samples=SAMPLES,
             dim=2,
             number_unit_vectors=UNIT_VECTORS,
             steps=i,
@@ -129,7 +130,7 @@ def compare_configs():
     ).double()
 
     sampling_config = PCDSamplerConfig(
-        number_samples=5,
+        number_samples=SAMPLES,
         dim=2,
         number_unit_vectors=10000,
         steps=200,
@@ -157,6 +158,9 @@ def compare_configs():
     mean_init_det_uv = []
 
     for i in range(SEEDS):
+        print(f"Running seed {i+1}/{SEEDS}")
+        
+        print("Config: Random Init + Random UV")
         distances = calc_cvms_for_seed(
             seed=i,
             cvm_unit_vectors=cvm_unit_vectors,
@@ -168,6 +172,7 @@ def compare_configs():
         )
         rand_init_rand_uv.append(distances)
 
+        print("Config: Mean Init + Random UV")
         distances = calc_cvms_for_seed(
             seed=i,
             cvm_unit_vectors=cvm_unit_vectors,
@@ -179,6 +184,7 @@ def compare_configs():
         )
         mean_init_rand_uv.append(distances)
 
+        print("Config: Random Init + Deterministic UV")
         distances = calc_cvms_for_seed(
             seed=i,
             cvm_unit_vectors=cvm_unit_vectors,
@@ -190,6 +196,7 @@ def compare_configs():
         )
         rand_init_det_uv.append(distances)
 
+        print("Config: Mean Init + Deterministic UV")
         distances = calc_cvms_for_seed(
             seed=i,
             cvm_unit_vectors=cvm_unit_vectors,

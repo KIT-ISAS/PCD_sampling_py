@@ -226,14 +226,12 @@ class PCDSampler:
             assert n_means > 0, "means must contain at least one component"
 
             # random order of means
-            perm = torch.randperm(n_means, device=means.device)
-
-            # repeat the permutation enough times and cut to desired length
-            reps = (n_samples + n_means - 1) // n_means   # ceil(n_samples / n_means)
-            indices = perm.repeat(reps)[:n_samples]
-
+            weights = torch.ones(n_means, device=means.device)
+            indices = torch.multinomial(weights, n_samples, replacement=(n_samples > n_means))
             samples = means[indices]
+            
             return samples
+
 
         elif self.initial_sampling_method == "ut":
             # We use the unscented transform to get the initial samples.

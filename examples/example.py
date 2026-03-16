@@ -46,13 +46,13 @@ def sample():
         print(f"Sampling step {i}")
         start = time.time()
         sampling_config = PCDSamplerConfig(
-            number_samples=5,
+            number_samples=100,
             dim=2,
             number_unit_vectors=2000,
             steps=i,
             # threshold=1e-6,
             sorting=True,
-            initial_sampling_method="random",
+            initial_sampling_method="mean",
             unit_vectors_method="random",
         )
         sampler = PCDSampler(sampling_config)
