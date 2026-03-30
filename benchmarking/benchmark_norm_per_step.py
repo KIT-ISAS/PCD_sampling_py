@@ -11,7 +11,7 @@ from pcd_sampling_py.models import PCDSamplerConfig
 from pcd_sampling_py.sampler import PCDSampler
 
 
-def build_gaussian_mixture(dim: int = 2, components: int = 2, device: torch.device | None = None):
+def build_gaussian_mixture(dim: int = 10, components: int = 2, device: torch.device | None = None):
     device = device or torch.device("cpu")
     weights = torch.full((components,), 1.0 / components, device=device, dtype=torch.float32)
     means = torch.zeros((components, dim), device=device, dtype=torch.float32)
@@ -44,7 +44,8 @@ def run_benchmark(
         number_samples=number_samples,
         steps=steps,
         sorting=True,
-        threshold=1e-4,
+        # threshold=1e-4,
+        
     )
 
     sampler = PCDSampler(sampler_cfg)
@@ -64,7 +65,7 @@ def run_benchmark(
     ax.plot(range(len(norms)), norms.numpy(), marker="o", label="mean gain norm")
     ax.set_xlabel("Step")
     ax.set_ylabel("Mean gain norm")
-    ax.set_title("Gain norm per step (dim=2, components=2)")
+    ax.set_title("Gain norm per step (dim=2, components=10, samples=10, uv=40)")
     ax.grid(True, which="both", linestyle="--", alpha=0.6)
     ax.legend()
     plt.tight_layout()
@@ -79,9 +80,9 @@ def run_benchmark(
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Benchmark gain norm per step for 2D, 2-component GM.")
-    parser.add_argument("--samples", type=int, default=1000, help="Number of samples (L).")
+    parser.add_argument("--samples", type=int, default=10, help="Number of samples (L).")
     parser.add_argument("--steps", type=int, default=40, help="Number of optimization steps.")
-    parser.add_argument("--unit-vectors", type=int, default=1000, help="Number of unit vectors (K).")
+    parser.add_argument("--unit-vectors", type=int, default=30, help="Number of unit vectors (K).")
     parser.add_argument(
         "--device",
         type=str,

@@ -3,10 +3,11 @@ import time
 import torch
 import matplotlib.pyplot as plt
 
-from benchmarking.cvm import sample_unit_vectors
+# from benchmarking.cvm import sample_unit_vectors
 from pcd_sampling_py import sampler
 from pcd_sampling_py.models import PCDSamplerConfig
 from pcd_sampling_py.sampler import PCDSampler
+from pcd_sampling_py.sampling_utils import sample_ut
 
 """
 A simple example of a 2 D Gaussian mixture
@@ -14,18 +15,23 @@ A simple example of a 2 D Gaussian mixture
 
 
 def sample():
-    weights = torch.tensor([0.5, 0.5])
-    means = torch.tensor([[2.0, 0.0], [-2.0, 0.0]])
-    covariances = torch.tensor([[[3.0, 2.8], [2.8, 3.0]], [[3.0, -2.8], [-2.8, 3.0]]])
+    # weights = torch.tensor([0.5, 0.5])
+    # means = torch.tensor([[2.0, 0.0], [-2.0, 0.0]])
+    # covariances = torch.tensor([[[3.0, 2.8], [2.8, 3.0]], [[3.0, -2.8], [-2.8, 3.0]]])
+    
+    # weights = torch.tensor([0.5, 0.5])
+    # means = torch.tensor([[4.0, 0.0], [-4.0, 0.0]])
+    # covariances = torch.tensor([[[1.0, 0], [0., 1.0]], [[1.0, 0.], [0., 1.0]]])
+    
     # weights = torch.tensor([0.2, 0.2, 0.2, 0.2, 0.2])
     # means = torch.tensor([[0.0, 0.0], [0.0, 0.0], [1.0, 1.0], [-1.0, -1.0], [1.0, -1.0]])
     # covariances = torch.tensor([[[3.0, 2.8], [2.8, 3.0]], [[3.0, -2.8], [-2.8, 3.0]], [[3.0, 0.0], [0.0, 3.0]], [[3.0, 0.0], [0.0, 3.0]], [[3.0, 0.0], [0.0, 3.0]]])
-    # weights = torch.tensor([1.])
-    # means = torch.tensor([[0.0, 0.0]])
-    # covariances = torch.tensor([[[3.0, 2.8], [2.8, 3.0]]])
+    weights = torch.tensor([1.])
+    means = torch.tensor([[0.0, 0.0]])
+    covariances = torch.tensor([[[3.0, 1.0], [1.0, 3.0]]])
 
-    torch.manual_seed(10)
-    unit_vectors = sample_unit_vectors(10, 2, device=means.device, dtype=means.dtype).double()
+    torch.manual_seed(4)
+    # unit_vectors = sample_unit_vectors(10, 2, device=means.device, dtype=means.dtype).double()
 
     sum_time = 0.0
     last_samples = None
@@ -42,22 +48,24 @@ def sample():
     # )
     # sampler = PCDSampler(sampling_config)
 
-    for i in range(13):
+    for i in range(1):
         print(f"Sampling step {i}")
         start = time.time()
         sampling_config = PCDSamplerConfig(
-            number_samples=100,
+            number_samples=5,
             dim=2,
-            number_unit_vectors=2000,
-            steps=i,
+            number_unit_vectors=30,
+            steps=5,
             # threshold=1e-6,
             sorting=True,
             initial_sampling_method="mean",
-            unit_vectors_method="random",
+            unit_vectors_method="deterministic",
         )
         sampler = PCDSampler(sampling_config)
 
         X = sampler.sample(weights, means, covariances)
+        # X = sample_ut(mean=means[0], covariance=covariances[0])
+        
         last_samples = X
         diff = time.time() - start
         if i != 0:
@@ -68,9 +76,9 @@ def sample():
 
     # last_samples = sampler.sample(weights, means, covariances)
     
-    vectors = sampler.unit_vectors.detach().cpu().numpy()
-    for v in vectors:
-        plt.plot([0, v[0]], [0, v[1]], color="red", alpha=0.3, linewidth=0.8)
+    # vectors = sampler.unit_vectors.detach().cpu().numpy()
+    # for v in vectors:
+    #     plt.plot([0, v[0]], [0, v[1]], color="red", alpha=0.3, linewidth=0.8)
     if last_samples is not None:
         plot_gaussian_mixture_and_samples(
             weights,
@@ -79,8 +87,8 @@ def sample():
             last_samples,
             grid_size=200,
             save_paths=["examples/gm_samples.png", "examples/result.png"],
-            show=False,
-            vectors=vectors,
+            show=True,
+            # vectors=vectors,
         )
         print("Saved plots to examples/gm_samples.png and examples/result.png")
 
@@ -161,15 +169,7 @@ def plot_gaussian_mixture_and_samples(
     #     plt.plot([0, v[0]], [0, v[1]], color="red", alpha=0.3, linewidth=0.8)
 
     # Samples
-    plt.scatter(
-        samples_cpu[:, 0],
-        samples_cpu[:, 1],
-        c="white",
-        s=40,
-        label="Samples",
-        edgecolors="black",
-        linewidths=0.6,
-    )
+  
     # plt.scatter(
     #     means_cpu[:, 0],
     #     means_cpu[:, 1],

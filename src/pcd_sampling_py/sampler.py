@@ -72,6 +72,8 @@ class PCDSampler:
             self.create_unit_vectors_random()
         elif self.unit_vectors_method == "deterministic":
             self.create_unit_vectors_deterministic()
+        else:
+            raise ValueError("unit_vectors_method can be either 'random' or 'deterministic'")
 
     def create_unit_vectors_random(self):
         """
@@ -229,6 +231,10 @@ class PCDSampler:
             weights = torch.ones(n_means, device=means.device)
             indices = torch.multinomial(weights, n_samples, replacement=(n_samples > n_means))
             samples = means[indices]
+            
+            # Jitter to avoid local minima, when multiple samples are initialized at the same mean.
+            jitters = torch.randn_like(samples) * 1e-4
+            samples += jitters
             
             return samples
 
