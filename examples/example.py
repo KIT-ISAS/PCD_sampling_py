@@ -16,19 +16,19 @@ A simple example of a 2 D Gaussian mixture
 
 def sample():
     # weights = torch.tensor([0.5, 0.5])
-    # means = torch.tensor([[2.0, 0.0], [-2.0, 0.0]])
+    # means = torch.tensor([[0.0, 0.0], [0.0, 0.0]])
     # covariances = torch.tensor([[[3.0, 2.8], [2.8, 3.0]], [[3.0, -2.8], [-2.8, 3.0]]])
     
-    # weights = torch.tensor([0.5, 0.5])
-    # means = torch.tensor([[4.0, 0.0], [-4.0, 0.0]])
-    # covariances = torch.tensor([[[1.0, 0], [0., 1.0]], [[1.0, 0.], [0., 1.0]]])
+    weights = torch.tensor([0.5, 0.5])
+    means = torch.tensor([[2.0, 0.0], [-2., 0.0]])
+    covariances = torch.tensor([[[1.0, 0], [0., 1.0]], [[1.0, 0.], [0., 1.0]]])
     
     # weights = torch.tensor([0.2, 0.2, 0.2, 0.2, 0.2])
     # means = torch.tensor([[0.0, 0.0], [0.0, 0.0], [1.0, 1.0], [-1.0, -1.0], [1.0, -1.0]])
-    # covariances = torch.tensor([[[3.0, 2.8], [2.8, 3.0]], [[3.0, -2.8], [-2.8, 3.0]], [[3.0, 0.0], [0.0, 3.0]], [[3.0, 0.0], [0.0, 3.0]], [[3.0, 0.0], [0.0, 3.0]]])
-    weights = torch.tensor([1.])
-    means = torch.tensor([[0.0, 0.0]])
-    covariances = torch.tensor([[[3.0, 1.0], [1.0, 3.0]]])
+    # # covariances = torch.tensor([[[3.0, 2.8], [2.8, 3.0]], [[3.0, -2.8], [-2.8, 3.0]], [[3.0, 0.0], [0.0, 3.0]], [[3.0, 0.0], [0.0, 3.0]], [[3.0, 0.0], [0.0, 3.0]]])
+    # weights = torch.tensor([1.])
+    # means = torch.tensor([[0.0, 0.0]])
+    # covariances = torch.tensor([[[3.0, 1.0], [1.0, 3.0]]])
 
     torch.manual_seed(4)
     # unit_vectors = sample_unit_vectors(10, 2, device=means.device, dtype=means.dtype).double()
@@ -52,13 +52,13 @@ def sample():
         print(f"Sampling step {i}")
         start = time.time()
         sampling_config = PCDSamplerConfig(
-            number_samples=5,
+            number_samples=2,
             dim=2,
-            number_unit_vectors=30,
-            steps=5,
+            number_unit_vectors=100,
+            steps=100,
             # threshold=1e-6,
             sorting=True,
-            initial_sampling_method="mean",
+            initial_sampling_method="random",
             unit_vectors_method="deterministic",
         )
         sampler = PCDSampler(sampling_config)
@@ -86,12 +86,11 @@ def sample():
             covariances,
             last_samples,
             grid_size=200,
-            save_paths=["examples/gm_samples.png", "examples/result.png"],
+            save_paths=["examples/gm_samples.pdf", "examples/result.pdf"],
             show=True,
             # vectors=vectors,
         )
-        print("Saved plots to examples/gm_samples.png and examples/result.png")
-
+        print("Saved plots to examples/gm_samples.pdf and examples/result.pdf")
 
 def plot_gaussian_mixture_and_samples(
     weights: torch.Tensor,
@@ -101,7 +100,7 @@ def plot_gaussian_mixture_and_samples(
     grid_size: int = 150,
     save_paths: list[str] | None = None,
     show: bool = False,
-    vectors: torch.Tensor | None = None,
+    # vectors: torch.Tensor | None = None,
 ):
     """Plot a 2D Gaussian mixture density and sample locations.
 
@@ -116,6 +115,7 @@ def plot_gaussian_mixture_and_samples(
     """
 
     device = weights.device
+    
 
     # Ensure float precision for distributions
     weights = weights.to(dtype=torch.float32)
@@ -148,6 +148,9 @@ def plot_gaussian_mixture_and_samples(
     yy_cpu = yy.cpu()
     means_cpu = means.cpu()
     samples_cpu = samples.cpu()
+    
+    # Use latex rendering for better text quality
+    plt.rcParams.update({"font.size": 20})
 
     plt.figure(figsize=(8, 6))
     contour = plt.contourf(xx_cpu, yy_cpu, density, levels=30, cmap="Blues", alpha=0.85)
@@ -160,30 +163,31 @@ def plot_gaussian_mixture_and_samples(
         samples_cpu[:, 0],
         samples_cpu[:, 1],
         c="white",
-        s=40,
-        label="Samples",
+        s=200,
+        label="Optimal samples",
         edgecolors="black",
-        linewidths=0.6,
+        linewidths=1.5,
     )
     # for v in vectors:
     #     plt.plot([0, v[0]], [0, v[1]], color="red", alpha=0.3, linewidth=0.8)
 
     # Samples
   
-    # plt.scatter(
-    #     means_cpu[:, 0],
-    #     means_cpu[:, 1],
-    #     c="goldenrod",
-    #     s=40,
-    #     label="Component means",
-    #     edgecolors="black",
-    #     linewidths=0.8,
-    # )
+    plt.scatter(
+        means_cpu[:, 0],
+        means_cpu[:, 1],
+        c="darkorange",
+        s=200,
+        label="Component means",
+        edgecolors="black",
+        linewidths=0.8,
+        marker="X",
+    )
 
-    plt.xlabel("x")
-    plt.ylabel("y")
-    plt.title("Gaussian Mixture and Samples")
-    plt.legend(loc="upper right")
+    # plt.xlabel("x")
+    # plt.ylabel("y")
+    # plt.title("Gaussian Mixture and Samples")
+    plt.legend(loc="upper left")
     plt.tight_layout()
 
     if save_paths:

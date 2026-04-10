@@ -64,7 +64,7 @@ def plot_gm_and_ut(
 
     # --- Plot ---
     fig, ax = plt.subplots(figsize=(8, 6))
-
+    plt.rcParams.update({"font.size": 20})
     contour = ax.contourf(xx_np, yy_np, density, levels=30, cmap="Blues", alpha=0.85)
     ax.contour(xx_np, yy_np, density, levels=10, colors="black", linewidths=0.6, alpha=0.4)
     plt.colorbar(contour, ax=ax, label="Density")
@@ -86,8 +86,8 @@ def plot_gm_and_ut(
 
     # UT sigma points
     ax.scatter(sigma_np[:, 0], sigma_np[:, 1],
-               c="white", s=40, zorder=5,
-               edgecolors="black", linewidths=0.6, label="UT sigma points")
+               c="white", s=80, zorder=5,
+               edgecolors="black", linewidths=1.5, label="UT sigma points")
 
     ax.set_xlabel("x")
     ax.set_ylabel("y")
@@ -114,6 +114,6 @@ if __name__ == "__main__":
     with torch.no_grad():
         plot_gm_and_ut(
             weights, means, covariances,
-            save_path="examples/ut_example.png",
+            save_path="examples/ut_example.pdf",
             show=True,
         )

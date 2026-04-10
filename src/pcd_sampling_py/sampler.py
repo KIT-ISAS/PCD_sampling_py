@@ -63,7 +63,7 @@ class PCDSampler:
         else:
             self.compute_delta_x: Callable = self._delta_x_vmap
 
-        self.numbers = torch.arange(0, self.number_samples)
+        self.numbers = torch.arange(0, self.number_samples, device=self.device)
 
         # Pre-allocate unit vectors, so that we don't calculate them in every step.
         # This can also be done deterministicaly with vectors uniformally covering the unit sphere. #TODO: later

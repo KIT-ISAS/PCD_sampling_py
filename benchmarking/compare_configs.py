@@ -14,13 +14,14 @@ from pcd_sampling_py.sampling_utils import sot_sphere
 
 UNIT_VECTORS = 50
 STEPS = 30
-SEEDS = 40
-SAMPLES = 2
+SEEDS = 70
+SAMPLES = 5
 
 
 def plot_convergence(all_distances: list, gt: float):
     import matplotlib.pyplot as plt
     import numpy as np
+    plt.rcParams.update({"font.size": 20})
 
     all_distances = np.array(
         all_distances
@@ -33,17 +34,17 @@ def plot_convergence(all_distances: list, gt: float):
 
     config_labels = [
         "Random Init + Random UV",
-        "Mean Init + Random UV",
-        "Random Init + Deterministic UV",
+        # "Mean Init + Random UV",
+        # "Random Init + Deterministic UV",
         "Mean Init + Deterministic UV",
     ]
 
     for i in range(mean_distances.shape[0]):
         # plt.plot(mean_distances[i], label=config_labels[i])
-        plt.plot(medians[i], label=f"{config_labels[i]} Median", linestyle="--")
-        plt.fill_between(
-            range(STEPS), medians[i] - iqrs[0, i], medians[i] + iqrs[1, i], alpha=0.2
-        )
+        plt.plot(medians[i], label=f"{config_labels[i]} Median", linestyle="--", linewidth=2)
+        # plt.fill_between(
+        #     range(STEPS), medians[i] - iqrs[0, i], medians[i] + iqrs[1, i], alpha=0.2
+        # )
 
     plt.axhline(gt, color="red", linestyle="--", label="Ground truth CvM distance")
     plt.xlabel("Steps")
@@ -53,7 +54,7 @@ def plot_convergence(all_distances: list, gt: float):
     plt.grid()
 
     # save the plot to a file instead of showing it
-    plt.savefig("pcd_convergence_comparison.png")
+    plt.savefig("pcd_convergence_comparison.pdf")
 
     plt.show()
 
@@ -133,11 +134,11 @@ def compare_configs():
         number_samples=SAMPLES,
         dim=2,
         number_unit_vectors=10000,
-        steps=200,
+        steps=300,
         # threshold=1e-6,
         sorting=True,
-        initial_sampling_method="random",
-        unit_vectors_method="random",
+        initial_sampling_method="mean",
+        unit_vectors_method="deterministic",
     )
     sampler = PCDSampler(sampling_config)
 
@@ -172,29 +173,29 @@ def compare_configs():
         )
         rand_init_rand_uv.append(distances)
 
-        print("Config: Mean Init + Random UV")
-        distances = calc_cvms_for_seed(
-            seed=i,
-            cvm_unit_vectors=cvm_unit_vectors,
-            weights=weights,
-            means=means,
-            covariances=covariances,
-            initial_sampling_method="mean",
-            unit_vectors_method="random",
-        )
-        mean_init_rand_uv.append(distances)
+        # print("Config: Mean Init + Random UV")
+        # distances = calc_cvms_for_seed(
+        #     seed=i,
+        #     cvm_unit_vectors=cvm_unit_vectors,
+        #     weights=weights,
+        #     means=means,
+        #     covariances=covariances,
+        #     initial_sampling_method="mean",
+        #     unit_vectors_method="random",
+        # )
+        # mean_init_rand_uv.append(distances)
 
-        print("Config: Random Init + Deterministic UV")
-        distances = calc_cvms_for_seed(
-            seed=i,
-            cvm_unit_vectors=cvm_unit_vectors,
-            weights=weights,
-            means=means,
-            covariances=covariances,
-            initial_sampling_method="random",
-            unit_vectors_method="deterministic",
-        )
-        rand_init_det_uv.append(distances)
+        # print("Config: Random Init + Deterministic UV")
+        # distances = calc_cvms_for_seed(
+        #     seed=i,
+        #     cvm_unit_vectors=cvm_unit_vectors,
+        #     weights=weights,
+        #     means=means,
+        #     covariances=covariances,
+        #     initial_sampling_method="random",
+        #     unit_vectors_method="deterministic",
+        # )
+        # rand_init_det_uv.append(distances)
 
         print("Config: Mean Init + Deterministic UV")
         distances = calc_cvms_for_seed(
@@ -209,7 +210,8 @@ def compare_configs():
         mean_init_det_uv.append(distances)
 
     plot_convergence(
-        [rand_init_rand_uv, mean_init_rand_uv, rand_init_det_uv, mean_init_det_uv],
+        # [rand_init_rand_uv, mean_init_rand_uv, rand_init_det_uv, mean_init_det_uv],
+        [rand_init_rand_uv, mean_init_det_uv],
         gt_cvm.item(),
     )
 

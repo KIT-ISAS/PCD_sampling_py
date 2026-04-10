@@ -45,6 +45,7 @@ def run_benchmark(
         steps=steps,
         sorting=True,
         # threshold=1e-4,
+        initial_sampling_method="mean"
         
     )
 
@@ -57,7 +58,7 @@ def run_benchmark(
 
     output_dir.mkdir(parents=True, exist_ok=True)
     csv_path = output_dir / f"pcd_norms_dim=2_comp=2_steps={steps}.csv"
-    png_path = output_dir / f"pcd_norms_dim=2_comp=2_steps={steps}.png"
+    png_path = output_dir / f"pcd_norms_dim=2_comp=2_steps={steps}.pdf"
 
     np.savetxt(csv_path, norms.numpy(), delimiter=",", header="mean_gain_norm", comments="")
 
@@ -111,4 +112,6 @@ def main() -> None:
 
 
 if __name__ == "__main__":
+    torch.set_default_device("cuda" if torch.cuda.is_available() else "cpu")
+    torch.manual_seed(1)
     main()

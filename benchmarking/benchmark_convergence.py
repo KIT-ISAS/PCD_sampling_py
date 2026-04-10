@@ -95,7 +95,7 @@ def run_benchmark(
 
     output_dir.mkdir(parents=True, exist_ok=True)
     csv_path = output_dir / f"pcd_moment_errors_dim={dim}_comp={components}_steps={max_steps}.csv"
-    png_path = output_dir / f"pcd_moment_errors_dim={dim}_comp={components}_steps={max_steps}.png"
+    png_path = output_dir / f"pcd_moment_errors_dim={dim}_comp={components}_steps={max_steps}.pdf"
 
     np.savetxt(
         csv_path,
