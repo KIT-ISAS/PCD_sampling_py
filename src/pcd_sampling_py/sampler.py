@@ -6,10 +6,7 @@ from pcd_sampling_py.sampling_utils import (
     gm_cdf_1d,
     gm_pdf_1d,
     heaviside_mean,
-    reduce_gm,
     sample_gm,
-    sample_gm_cached_cholesky,
-    sample_ut,
     sot_sphere,
 )
 
@@ -34,11 +31,6 @@ class PCDSampler:
         self.initial_sampling_method = config.initial_sampling_method
         self.unit_vectors_method = config.unit_vectors_method
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-
-        if self.initial_sampling_method == "ut":
-            assert (
-                self.number_samples == self.dim * 2 + 1
-            ), "UT sampling requires 2 * N + 1 samples."
 
         self.alpha_max = 2
         self.alpha_min = 0.01
@@ -238,12 +230,6 @@ class PCDSampler:
             
             return samples
 
-
-        elif self.initial_sampling_method == "ut":
-            # We use the unscented transform to get the initial samples.
-            reduced_mean, reduced_cov = reduce_gm(weights, means, covariances)
-            samples = sample_ut(reduced_mean, reduced_cov)
-            return samples
         elif self.initial_sampling_method == "random":
             return sample_gm(weights, means, covariances, self.number_samples)
         else:
