@@ -9,6 +9,8 @@ from pcd_sampling_py.models import PCDSamplerConfig
 from pcd_sampling_py.sampler import PCDSampler
 from pcd_sampling_py.sampling_utils import sample_ut
 
+import pyinstrument
+
 """
 A simple example of a 2 D Gaussian mixture
 """
@@ -52,7 +54,7 @@ def sample():
         print(f"Sampling step {i}")
         start = time.time()
         sampling_config = PCDSamplerConfig(
-            number_samples=2,
+            number_samples=200,
             dim=2,
             number_unit_vectors=100,
             steps=100,
@@ -64,8 +66,15 @@ def sample():
         sampler = PCDSampler(sampling_config)
 
         X = sampler.sample(weights, means, covariances)
+
+        # prof = pyinstrument.Profiler(1e-4)
+        # prof.start()
+        # X = sampler.sample(weights, means, covariances)
         # X = sample_ut(mean=means[0], covariance=covariances[0])
-        
+        # prof.stop()
+        # prof.print()
+        # prof.write_html("trace.html")
+
         last_samples = X
         diff = time.time() - start
         if i != 0:
@@ -79,6 +88,7 @@ def sample():
     # vectors = sampler.unit_vectors.detach().cpu().numpy()
     # for v in vectors:
     #     plt.plot([0, v[0]], [0, v[1]], color="red", alpha=0.3, linewidth=0.8)
+    last_samples = None
     if last_samples is not None:
         plot_gaussian_mixture_and_samples(
             weights,
@@ -199,6 +209,7 @@ def plot_gaussian_mixture_and_samples(
 
 
 if __name__ == "__main__":
-    torch.set_default_device("cuda")
+    # torch.set_default_device("cuda")
+    torch.set_num_threads(16)
     with torch.no_grad():
         sample()
