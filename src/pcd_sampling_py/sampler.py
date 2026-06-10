@@ -39,16 +39,16 @@ class PCDSampler:
 
         # Batch functions for calculating gain.
         self._delta_r_vmap = torch.func.vmap(
-            self.calculate_delta_r, in_dims=(0, None, None, None, None)
+            self.calculate_delta_r, in_dims=(0, None, None)
         )
         self._delta_x_vmap = torch.func.vmap(
-            self.calculate_delta_x, in_dims=(0, 0, 0, 0, None)
+            self.calculate_delta_x, in_dims=(0, 0, 0)
         )
         self._delta_r_sorted_vmap = torch.func.vmap(
-            self.calculate_delta_r_sorted, in_dims=(0, 0, None, None, None)
+            self.calculate_delta_r_sorted, in_dims=(0, 0, None)
         )
         self._delta_x_sorted_vmap = torch.func.vmap(
-            self.calculate_delta_x_sorted, in_dims=(0, 0, 0, 0, None)
+            self.calculate_delta_x_sorted, in_dims=(0, 0, 0)
         )
 
         # If sorting of the projections is enabled use the correct impelementation
