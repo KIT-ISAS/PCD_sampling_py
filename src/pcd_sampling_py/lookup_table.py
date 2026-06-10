@@ -1,38 +1,28 @@
 import torch
 from torch import Tensor
-from pcd_sampling_py.sampling_utils import (
-    gm_cdf_1d,
-    gm_pdf_1d)
+from torch.distributions import Distribution
 
-class LookupTable():
+class LookupTable(torch.nn.Module):
     """
-    Lookup-table approximation of a 1D Gaussian Mixture Model PDF/CDF
+    Lookup-table approximation of a 1D distribution's PDF and CDF
     using linear interpolation.
 
     Parameters
     ----------
-    weights : Tensor, shape (K,)
-        Mixture weights (should sum to 1).
-    means : Tensor, shape (K,)
-        Component means.
-    stds : Tensor, shape (K,)
-        Component standard deviations.
+    dist : Distribution
+        Distribution providing log_prob() and cdf().
     num_points : int
         Number of lookup-table points.
-    xmin : float, optional
-        Lower grid bound. If None, computed automatically.
-    xmax : float, optional
-        Upper grid bound. If None, computed automatically.
+    xmin, xmax : float, optional
+        Grid bounds. If omitted they are chosen as
+        mean ± nsigma * stddev.
     nsigma : float
-        Range for automatic bounds:
-        [min(mu - nsigma*sigma), max(mu + nsigma*sigma)].
+        Range used when bounds are computed automatically.
     """
 
     def __init__(
         self,
-        weights: Tensor,
-        means: Tensor,
-        stds: Tensor,
+        dist: Distribution,
         num_points,
         xmin=None,
         xmax=None,
@@ -40,24 +30,20 @@ class LookupTable():
     ):
         super().__init__()
 
-        weights = weights / weights.sum()
-
         if xmin is None:
-            xmin = torch.min(means - nsigma * stds).item()
+            xmin = dist.mean - nsigma * dist.stddev
+        self.xmin = float(xmin)
 
         if xmax is None:
-            xmax = torch.max(means + nsigma * stds).item()
-
-        grid = torch.linspace(xmin, xmax, num_points)
-
-#TODO: is this correct? Work with distributions instead of weights, means, std
-        self.pdf = gm_pdf_1d(grid, weights, means, stds)
-        self.cdf = gm_cdf_1d(grid, weights, means, stds)
-    
-        self.xmin = float(xmin)
+            xmax = dist.mean + nsigma * dist.stddev
         self.xmax = float(xmax)
+
+        grid = torch.linspace(xmin, xmax, num_points, device=dist.mean.device, dtype=dist.mean.dtype)
+        table = torch.stack((torch.exp(dist.log_prob(grid)), dist.cdf(grid)), dim=-1)
+        self.register_buffer("table", table)
+        
         self.num_points = int(num_points)
-        self.dx = (self.xmax - self.xmin) / (self.num_points - 1)
+        self.inv_dx = (num_points - 1) / (self.xmax - self.xmin)
 
 
     def pdf_cdf(self, x: Tensor):
@@ -66,17 +52,12 @@ class LookupTable():
         """
 
         x_clamped = x.clamp(self.xmin, self.xmax)
-
-        pos = (x_clamped - self.xmin) / self.dx
+        pos = (x_clamped - self.xmin) * self.inv_dx
 
         idx0 = torch.floor(pos).long()
         idx1 = (idx0 + 1).clamp(max=self.num_points - 1)
 
         frac = pos - idx0.float()
 
-        return (self.__lin_int(self.pdf[idx0], self.pdf[idx1], frac), self.__lin_int(self.cdf[idx0], self.cdf[idx1], frac))
-
-    @staticmethod
-    def __lin_int(y0, y1, frac):
-        return y0 + frac * (y1-y0)
+        return torch.lerp(self.table[idx0], self.table[idx1], frac[..., None])
 
