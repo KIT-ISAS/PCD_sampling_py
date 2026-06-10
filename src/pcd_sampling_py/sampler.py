@@ -1,15 +1,17 @@
-from typing import Callable
+from typing import Callable, Protocol
 import torch
 from torch import Tensor
+from torch.distributions import Normal
 from pcd_sampling_py.models import PCDSamplerConfig
 from pcd_sampling_py.sampling_utils import (
-    gm_cdf_1d,
-    gm_pdf_1d,
     heaviside_mean,
     sample_gm,
     sot_sphere,
 )
 
+class HasPdfCdf(Protocol):
+    def pdf_cdf(self, x: Tensor) -> Tensor:
+        ...
 
 class PCDSampler:
     """
@@ -94,7 +96,7 @@ class PCDSampler:
 
     @torch.compile
     def calculate_delta_r(
-        self, x: Tensor, r: Tensor, weights: Tensor, means: Tensor, stds: Tensor
+        self, x: Tensor, r: Tensor, projection: HasPdfCdf
     ):
         """
         This function is used to compute the gain between real and approximation projected distributions
@@ -105,10 +107,9 @@ class PCDSampler:
         :param means: (T, )
         :param stds: (T, T)
 
-        L - number of sampoles, T - number of components in GM
+        L - number of samples, T - number of components in GM
         """
-        F_tilda = gm_cdf_1d(x, weights, means, stds)
-        f_tilda = gm_pdf_1d(x, weights, means, stds)
+        f_tilda, F_tilda = projection.pdf_cdf(x).unbind(-1)
 
         F = heaviside_mean(x, r)
 
@@ -117,7 +118,7 @@ class PCDSampler:
 
     @torch.compile
     def calculate_delta_r_sorted(
-        self, x: Tensor, i: Tensor, weights: Tensor, means: Tensor, stds: Tensor
+        self, x: Tensor, i: Tensor, projection: HasPdfCdf
     ):
         """
         This function is used to compute the gain between real and approximation projected distributions for sorted projections.
@@ -128,10 +129,9 @@ class PCDSampler:
         :param means: (T, )
         :param stds: (T, T)
 
-        L - number of sampoles, T - number of components in GM
+        L - number of samples, T - number of components in GM
         """
-        F_tilda = gm_cdf_1d(x, weights, means, stds)
-        f_tilda = gm_pdf_1d(x, weights, means, stds)
+        f_tilda, F_tilda = projection.pdf_cdf(x).unbind(-1)
 
         eps = 1e-3  # to avoid division by zero.
         return -(
@@ -141,7 +141,7 @@ class PCDSampler:
 
     @torch.compile
     def calculate_delta_x(
-        self, r: Tensor, u: Tensor, means: Tensor, stds: Tensor, weights: Tensor
+        self, r: Tensor, u: Tensor, projections: Tensor
     ):
         """
         This function is used to compute the gain for all samples with respect to the provided unit vector.
@@ -152,14 +152,14 @@ class PCDSampler:
         :param stds: projection stds of the original GM.
         :param weights: weights of the original GM.
         """
-        delta_r = self._delta_r_vmap(r, r, weights, means, stds)
+        delta_r = self._delta_r_vmap(r, r, projections)
         delta_x = (u[None, :] * delta_r[:, None]) / self.number_unit_vectors
 
         return delta_x
 
     @torch.compile
     def calculate_delta_x_sorted(
-        self, r: Tensor, u: Tensor, means: Tensor, stds: Tensor, weights: Tensor
+        self, r: Tensor, u: Tensor, projections: Tensor
     ):
         """
         This function is used to compute the gain for all samples with respect to the provided unit vector.
@@ -174,7 +174,7 @@ class PCDSampler:
 
         sorted_r, idx = torch.sort(r)
         delta_r_sorted = self._delta_r_sorted_vmap(
-            sorted_r, self.numbers, weights, means, stds
+            sorted_r, self.numbers, projections
         )
 
         # Returning to the original order
@@ -182,7 +182,7 @@ class PCDSampler:
         delta_x = (u[None, :] * delta_r_original[:, None]) / self.number_unit_vectors
         return delta_x
 
-    def _calculate_gain(self, step, X, projected_means, projected_stds, weights):
+    def _calculate_gain(self, step, X, projections):
         coef = (
             self.alpha_min * step / self.steps
             + self.alpha_max * (self.steps - step) / self.steps
@@ -193,7 +193,7 @@ class PCDSampler:
 
         # Calculate the gain for the samples based on the differences between projections of real and approximate distributions
         delta_x: Tensor = self.compute_delta_x(
-            R, self.unit_vectors, projected_means, projected_stds, weights
+            R, self.unit_vectors, projections
         ).sum(
             dim=0
         )  # -> (L, N)
@@ -209,7 +209,7 @@ class PCDSampler:
         sigma2 = torch.clamp(sigma2, min=1e-3)
         projected_stds = torch.sqrt(sigma2)
 
-        return projected_means, projected_stds
+        return Normal(projected_means, projected_stds)
 
     def _initial_samples(self, weights: Tensor, means: Tensor, covariances: Tensor):
         if self.initial_sampling_method == "mean":
@@ -252,7 +252,7 @@ class PCDSampler:
         """
 
         # 1. Create projections of the original GM onto the unit vectors.
-        projected_means, projected_stds = self._calculate_projections(
+        projections = self._calculate_projections(
             means, covariances
         )
 
@@ -263,7 +263,7 @@ class PCDSampler:
         for _ in range(self.steps):
 
             coef, delta_x = self._calculate_gain(
-                _, X, projected_means, projected_stds, weights
+                _, X, projections
             )
             X += coef * delta_x
         return X
