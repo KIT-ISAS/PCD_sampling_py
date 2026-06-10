@@ -1,0 +1,67 @@
+name: CI
+
+on:
+  push:
+    branches: [ main ]
+    paths-ignore:
+      - '**/README.md' # do not trigger if only readme is changed
+      - '**/LICENSE'   # do not trigger if only license is changed
+  pull_request:
+    branches: [ main ]
+    paths-ignore:
+      - '**/README.md' # do not trigger if only readme is changed
+      - '**/LICENSE'   # do not trigger if only license is changed
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    permissions:
+      # Give the default GITHUB_TOKEN write permission to commit and push the
+      # added or changed files to the repository.
+      contents: write
+    strategy:
+      matrix:
+        python-version: ["3.10", "3.12", "3.13"]
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v6
+
+    - name: Set up Python ${{ matrix.python-version }}
+      uses: actions/setup-python@v6
+      with:
+        python-version: ${{ matrix.python-version }}
+
+    - name: Install uv
+      run: |
+        curl -LsSf https://astral.sh/uv/install.sh | sh
+        echo "$HOME/.cargo/bin" >> $GITHUB_PATH
+        
+    - name: Create virtual environment and install dependencies
+      run: |
+        uv venv
+        uv pip install -e .[test]
+        
+    - name: Run pytest with coverage
+      run: |
+        uv run pytest --cov=./src --cov-report=xml --cov-report=json:coverage.json
+
+    - name: Create images directory
+      if: matrix.python-version == '3.13'
+      run: mkdir -p ./images
+
+    - name: Generate coverage badge
+      if: matrix.python-version == '3.13'
+      run: |
+        uv pip install genbadge[coverage]
+        uv run genbadge coverage -i coverage.xml -o ./images/coverage.svg
+
+
+    - name: Commit coverage badge
+      if: github.ref == 'refs/heads/main' && matrix.python-version == '3.13'
+      run: |
+        git config --global user.name 'github-actions'
+        git config --global user.email 'github-actions@github.com'
+        git add ./images/coverage.svg
+        git commit -m "docs: update coverage badge" || exit 0
+        git push
