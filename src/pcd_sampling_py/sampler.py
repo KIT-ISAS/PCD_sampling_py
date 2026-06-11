@@ -256,7 +256,7 @@ class PCDSampler:
         """
         # 1. Create projections of the original GM onto the unit vectors.
         components = self._calculate_projections(means, covariances)
-        mixture = torch.distributions.Categorical(probs=weights.reshape(1, 2).expand(100, 2))
+        mixture = torch.distributions.Categorical(probs=weights.reshape(1, -1).expand(self.number_unit_vectors, -1))
         projections = torch.distributions.MixtureSameFamily(mixture, components)
 
         # 2. Create some random starting samples from the provided GM
