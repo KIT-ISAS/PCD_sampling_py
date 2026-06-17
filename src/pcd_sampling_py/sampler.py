@@ -30,6 +30,8 @@ class PCDSampler:
         self.dim = config.dim
         self.steps = config.steps
         self.sorting = config.sorting
+        self.lookup_table = config.lookup_table
+        self.local_update = config.local_update
         self.initial_sampling_method = config.initial_sampling_method
         self.unit_vectors_method = config.unit_vectors_method
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -50,6 +52,11 @@ class PCDSampler:
         self._delta_x_sorted_vmap = torch.func.vmap(
             self.calculate_delta_x_sorted, in_dims=(0, 0, 0, 0)
         )
+
+        if self.lookup_table:
+            self.pdf_cdf: Callable = self.pdf_cdf_dist
+        else:
+            self.pdf_cdf: Callable = self.pdf_cdf_lut       
 
         # If sorting of the projections is enabled use the correct impelementation
         if self.sorting:
@@ -93,6 +100,17 @@ class PCDSampler:
             iterations=300,
             device=self.device,
         )
+
+    @torch.compile
+    def pdf_cdf_dist(self, projections, R: Tensor):
+        pdf = torch.exp(projections.log_prob(R.transpose(0, 1))).transpose(0, 1)
+        cdf = projections.cdf(R.transpose(0, 1)).transpose(0, 1)
+        pdf, cdf
+
+    @torch.compile
+    def pdf_cdf_lut(self, luts, R: Tensor):
+        luts.pdf_cdf(R)
+
 
     @torch.compile
     def calculate_delta_r(
@@ -181,7 +199,7 @@ class PCDSampler:
         delta_r_original = delta_r_sorted[torch.argsort(idx)]
         delta_x = (u[None, :] * delta_r_original[:, None]) / self.number_unit_vectors
         return delta_x
-
+    
     def _calculate_gain(self, step, X, projections):
         coef = (
             self.alpha_min * step / self.steps
@@ -191,9 +209,7 @@ class PCDSampler:
         # Calculate projections onto unit vectors before hand
         R = self.unit_vectors @ X.T  # -> (K, L)
 
-        #TODO: Wrapper for distributionm that does the right thing; and Batched Lookuptable
-        pdf = torch.exp(projections.log_prob(R.transpose(0, 1))).transpose(0, 1)
-        cdf = cdf = projections.cdf(R.transpose(0, 1)).transpose(0, 1)
+        pdf, cdf = self.pdf_cdf(projections, R)
 
         # Calculate the gain for the samples based on the differences between projections of real and approximate distributions
         delta_x: Tensor = self.compute_delta_x(
@@ -203,6 +219,16 @@ class PCDSampler:
         )  # -> (L, N)
 
         return coef, delta_x
+    
+    def _calculate_gain_newton(self, X, projections):
+        # Calculate projections onto unit vectors before hand
+        R = self.unit_vectors @ X.T  # -> (K, L)
+
+        pdf, cdf = self.pdf_cdf(projections, R)
+
+        # Calculate the gain for the samples based on the differences between projections of real and approximate distributions
+        delta_x: Tensor = 
+        return delta_x
 
     def _calculate_projections(self, means, covariances):
         projected_means = self.unit_vectors @ means.T  # -> (K, L)
