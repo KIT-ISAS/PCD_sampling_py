@@ -215,10 +215,17 @@ class PCDSampler:
         # Calculate projections onto unit vectors before hand
         R = self.unit_vectors @ X.T  # -> (K, L)
 
-        pdf, cdf = self.pdf_cdf(projections, R)
+        pdf, cdf = self.pdf_cdf(projections, R).unbind(dim=-1)
+        _, idx = torch.sort(R)
+        ranks = torch.argsort(idx)
 
-        # Calculate the gain for the samples based on the differences between projections of real and approximate distributions
-        delta_x: Tensor = None
+        G = torch.einsum('ki,kj->ij', cdf - (2 * ranks - 1) / 2 / self.number_samples, self.unit_vectors)
+        outer = self.unit_vectors[:, :, None] * self.unit_vectors[:, None, :]   # (100, 2, 2)
+        H = torch.einsum('ki,kab->iab', pdf, outer)
+        
+        delta_x = -torch.linalg.solve(H, G)
+
+        # Returning to the original order
         return delta_x
 
     def _calculate_projections(self, means, covariances):
@@ -279,16 +286,19 @@ class PCDSampler:
         if self.lookup_table:
             projections = LookupTable(projections, 300)
 
-        print(projections)
-
         # 2. Create some random starting samples from the provided GM
         X = self._initial_samples(weights, means, covariances)
 
         # 3. Start the minimization loop
         for _ in range(self.steps):
-            coef, delta_x = self._calculate_gain(
-                _, X, projections
-            )
+            if self.local_update:
+                coef, delta_x = self._calculate_gain(
+                    _, X, projections
+                )
+            else:
+                coef = 1
+                delta_x = self._calculate_gain_newton(X, projections)
+            
             X += coef * delta_x
         return X
 

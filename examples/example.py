@@ -62,6 +62,7 @@ def sample():
             initial_sampling_method="random",
             unit_vectors_method="deterministic",
             lookup_table = False,
+            local_update=True,
         )
         sampler = PCDSampler(sampling_config)
 
