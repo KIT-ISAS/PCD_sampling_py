@@ -32,13 +32,15 @@ class LookupTable(torch.nn.Module):
 
         if xmin is None:
             xmin = dist.mean - nsigma * dist.stddev
-        self.xmin = float(xmin)
+        self.xmin = xmin
 
         if xmax is None:
             xmax = dist.mean + nsigma * dist.stddev
-        self.xmax = float(xmax)
+        self.xmax = xmax
 
-        grid = torch.linspace(xmin, xmax, num_points, device=dist.mean.device, dtype=dist.mean.dtype)
+        
+        t = torch.linspace(0, 1, num_points, device=dist.mean.device, dtype=dist.mean.dtype)
+        grid = xmin[:, None] + (xmax - xmin)[:, None] * t
         table = torch.stack((torch.exp(dist.log_prob(grid)), dist.cdf(grid)), dim=-1)
         self.register_buffer("table", table)
         

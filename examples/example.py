@@ -15,7 +15,6 @@ import pyinstrument
 A simple example of a 2 D Gaussian mixture
 """
 
-
 def sample():
     # weights = torch.tensor([0.5, 0.5])
     # means = torch.tensor([[0.0, 0.0], [0.0, 0.0]])
@@ -62,6 +61,7 @@ def sample():
             sorting=True,
             initial_sampling_method="random",
             unit_vectors_method="deterministic",
+            lookup_table = True,
         )
         sampler = PCDSampler(sampling_config)
 

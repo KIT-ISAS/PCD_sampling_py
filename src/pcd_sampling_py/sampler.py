@@ -3,6 +3,7 @@ import torch
 from torch import Tensor
 from torch.distributions import Normal
 from pcd_sampling_py.models import PCDSamplerConfig
+from pcd_sampling_py.lookup_table import LookupTable
 from pcd_sampling_py.sampling_utils import (
     heaviside_mean,
     sample_gm,
@@ -227,7 +228,7 @@ class PCDSampler:
         pdf, cdf = self.pdf_cdf(projections, R)
 
         # Calculate the gain for the samples based on the differences between projections of real and approximate distributions
-        delta_x: Tensor = 
+        delta_x: Tensor = None
         return delta_x
 
     def _calculate_projections(self, means, covariances):
@@ -285,12 +286,16 @@ class PCDSampler:
         mixture = torch.distributions.Categorical(probs=weights.reshape(1, -1).expand(self.number_unit_vectors, -1))
         projections = torch.distributions.MixtureSameFamily(mixture, components)
 
+        if self.lookup_table:
+            projections = LookupTable(projections, 100)
+
+        print(projections)
+
         # 2. Create some random starting samples from the provided GM
         X = self._initial_samples(weights, means, covariances)
 
         # 3. Start the minimization loop
         for _ in range(self.steps):
-
             coef, delta_x = self._calculate_gain(
                 _, X, projections
             )
