@@ -3,11 +3,12 @@ import torch
 from torch import Tensor
 from torch.distributions import Normal
 from pcd_sampling_py.models import PCDSamplerConfig
-from pcd_sampling_py.lookup_table import LookupTable
+from pcd_sampling_py.lookup_table import LookupTable, pdf_cdf_lut
 from pcd_sampling_py.sampling_utils import (
     heaviside_mean,
     sample_gm,
     sot_sphere,
+    pdf_cdf_dist
 )
 
 class HasPdfCdf(Protocol):
@@ -55,9 +56,9 @@ class PCDSampler:
         )
 
         if self.lookup_table:
-            self.pdf_cdf: Callable = self.pdf_cdf_dist
+            self.pdf_cdf: Callable = pdf_cdf_lut       
         else:
-            self.pdf_cdf: Callable = self.pdf_cdf_lut       
+            self.pdf_cdf: Callable = pdf_cdf_dist
 
         # If sorting of the projections is enabled use the correct impelementation
         if self.sorting:
@@ -101,17 +102,6 @@ class PCDSampler:
             iterations=300,
             device=self.device,
         )
-
-    @torch.compile
-    def pdf_cdf_dist(self, projections, R: Tensor):
-        pdf = torch.exp(projections.log_prob(R.transpose(0, 1))).transpose(0, 1)
-        cdf = projections.cdf(R.transpose(0, 1)).transpose(0, 1)
-        pdf, cdf
-
-    @torch.compile
-    def pdf_cdf_lut(self, luts, R: Tensor):
-        luts.pdf_cdf(R)
-
 
     @torch.compile
     def calculate_delta_r(
@@ -210,7 +200,7 @@ class PCDSampler:
         # Calculate projections onto unit vectors before hand
         R = self.unit_vectors @ X.T  # -> (K, L)
 
-        pdf, cdf = self.pdf_cdf(projections, R)
+        pdf, cdf = self.pdf_cdf(projections, R).unbind(dim=-1)
 
         # Calculate the gain for the samples based on the differences between projections of real and approximate distributions
         delta_x: Tensor = self.compute_delta_x(
@@ -287,7 +277,7 @@ class PCDSampler:
         projections = torch.distributions.MixtureSameFamily(mixture, components)
 
         if self.lookup_table:
-            projections = LookupTable(projections, 100)
+            projections = LookupTable(projections, 300)
 
         print(projections)
 

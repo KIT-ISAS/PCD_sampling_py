@@ -61,7 +61,7 @@ def sample():
             sorting=True,
             initial_sampling_method="random",
             unit_vectors_method="deterministic",
-            lookup_table = True,
+            lookup_table = False,
         )
         sampler = PCDSampler(sampling_config)
 
@@ -88,7 +88,7 @@ def sample():
     # vectors = sampler.unit_vectors.detach().cpu().numpy()
     # for v in vectors:
     #     plt.plot([0, v[0]], [0, v[1]], color="red", alpha=0.3, linewidth=0.8)
-    last_samples = None
+    # last_samples = None
     if last_samples is not None:
         plot_gaussian_mixture_and_samples(
             weights,

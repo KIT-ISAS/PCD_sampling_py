@@ -1,6 +1,7 @@
 import torch
 from torch import Tensor
 from torch.distributions import Distribution
+from pcd_sampling_py.sampling_utils import pdf_cdf_dist
 
 class LookupTable(torch.nn.Module):
     """
@@ -26,7 +27,7 @@ class LookupTable(torch.nn.Module):
         num_points,
         xmin=None,
         xmax=None,
-        nsigma=6.0,
+        nsigma=3.0,
     ):
         super().__init__()
 
@@ -41,7 +42,7 @@ class LookupTable(torch.nn.Module):
         
         t = torch.linspace(0, 1, num_points, device=dist.mean.device, dtype=dist.mean.dtype)
         grid = xmin[:, None] + (xmax - xmin)[:, None] * t
-        table = torch.stack((torch.exp(dist.log_prob(grid)), dist.cdf(grid)), dim=-1)
+        table = pdf_cdf_dist(dist, grid)
         self.register_buffer("table", table)
         
         self.num_points = int(num_points)
@@ -53,13 +54,17 @@ class LookupTable(torch.nn.Module):
         Returns (pdf, cdf).
         """
 
-        x_clamped = x.clamp(self.xmin, self.xmax)
-        pos = (x_clamped - self.xmin) * self.inv_dx
+        x_clamped = x.clamp(self.xmin[:, None], self.xmax[:, None])
+        pos = (x_clamped - self.xmin[:, None]) * self.inv_dx[:, None]
 
         idx0 = torch.floor(pos).long()
         idx1 = (idx0 + 1).clamp(max=self.num_points - 1)
 
         frac = pos - idx0.float()
+        rows = torch.arange(self.table.shape[0], device=self.table.device)[:, None]
+        
+        return torch.lerp(self.table[rows, idx0], self.table[rows, idx1], frac[..., None])
 
-        return torch.lerp(self.table[idx0], self.table[idx1], frac[..., None])
-
+@torch.compile
+def pdf_cdf_lut(luts: LookupTable, R: Tensor):
+    return luts.pdf_cdf(R)
