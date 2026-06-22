@@ -118,7 +118,6 @@ class PCDSampler:
 
         L - number of samples, T - number of components in GM
         """
-        # f_tilda, F_tilda = projection.pdf_cdf(x).unbind(-1)
 
         F = heaviside_mean(x, r)
 
@@ -140,7 +139,6 @@ class PCDSampler:
 
         L - number of samples, T - number of components in GM
         """
-        # f_tilda, F_tilda = projection.pdf_cdf(x).unbind(-1)
 
         eps = 1e-3  # to avoid division by zero.
         return -(

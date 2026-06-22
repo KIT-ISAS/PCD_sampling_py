@@ -4,10 +4,8 @@ import torch
 import matplotlib.pyplot as plt
 
 # from benchmarking.cvm import sample_unit_vectors
-from pcd_sampling_py import sampler
 from pcd_sampling_py.models import PCDSamplerConfig
 from pcd_sampling_py.sampler import PCDSampler
-from pcd_sampling_py.sampling_utils import sample_ut
 
 import pyinstrument
 
@@ -49,40 +47,34 @@ def sample():
     # )
     # sampler = PCDSampler(sampling_config)
 
-    for i in range(1):
-        print(f"Sampling step {i}")
-        start = time.time()
-        sampling_config = PCDSamplerConfig(
-            number_samples=200,
-            dim=2,
-            number_unit_vectors=100,
-            steps=100,
-            # threshold=1e-6,
-            sorting=True,
-            initial_sampling_method="random",
-            unit_vectors_method="deterministic",
-            lookup_table = False,
-            local_update=True,
-        )
-        sampler = PCDSampler(sampling_config)
+    start = time.time()
+    sampling_config = PCDSamplerConfig(
+        number_samples=200,
+        dim=2,
+        number_unit_vectors=100,
+        steps=100,
+        # threshold=1e-6,
+        sorting=True,
+        initial_sampling_method="random",
+        unit_vectors_method="deterministic",
+        lookup_table = False,
+        local_update=False,
+    )
+    sampler = PCDSampler(sampling_config)
 
-        X = sampler.sample(weights, means, covariances)
+    X = sampler.sample(weights, means, covariances)
 
-        # prof = pyinstrument.Profiler(1e-4)
-        # prof.start()
-        # X = sampler.sample(weights, means, covariances)
-        # X = sample_ut(mean=means[0], covariance=covariances[0])
-        # prof.stop()
-        # prof.print()
-        # prof.write_html("trace.html")
+    prof = pyinstrument.Profiler(1e-4)
+    prof.start()
+    X = sampler.sample(weights, means, covariances)
+    prof.stop()
+    prof.print()
+    prof.write_html("trace.html")
 
-        last_samples = X
-        diff = time.time() - start
-        if i != 0:
-            sum_time += diff
+    last_samples = X
+    diff = time.time() - start
 
-        print(f"Step {i}, elapsed: {diff}")
-    print(f"Total no comp: {sum_time}")
+    print(f"Elapsed: {diff}")
 
     # last_samples = sampler.sample(weights, means, covariances)
     
