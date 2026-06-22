@@ -1,0 +1,43 @@
+name: CI
+
+on:
+  push:
+    branches: [ main ]
+    paths-ignore:
+      - '**/README.md' # do not trigger if only readme is changed
+      - '**/LICENSE'   # do not trigger if only license is changed
+  pull_request:
+    branches: [ main ]
+    paths-ignore:
+      - '**/README.md' # do not trigger if only readme is changed
+      - '**/LICENSE'   # do not trigger if only license is changed
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ["3.10", "3.12", "3.13"]
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v6
+
+    - name: Set up Python ${{ matrix.python-version }}
+      uses: actions/setup-python@v6
+      with:
+        python-version: ${{ matrix.python-version }}
+
+    - name: Install uv
+      run: |
+        curl -LsSf https://astral.sh/uv/install.sh | sh
+        echo "$HOME/.cargo/bin" >> $GITHUB_PATH
+        
+    - name: Create virtual environment and install dependencies
+      run: |
+        uv venv
+        uv pip install -e .[test]
+        
+    - name: Run pytest with coverage
+      run: |
+        uv run pytest --cov=./src --cov-report=xml --cov-report=json:coverage.json

@@ -14,6 +14,8 @@ class PCDSamplerConfig:
     threshold: float = 0.1
     steps: int = 40
     sorting: bool = True
+    lookup_table: bool = True
+    local_update: bool = True
    
     # We can take initial samples by the mean or with ut so that they converge faster to desired distribution.
     initial_sampling_method: Literal["mean", "random", "ut"] = "random"

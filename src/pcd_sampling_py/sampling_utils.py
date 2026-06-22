@@ -1,5 +1,6 @@
 import torch
 from torch import Tensor
+from torch.distributions import Distribution
 
 
 @torch.compile
@@ -58,6 +59,11 @@ def sample_gm(
         weights, means, cholesky, number_samples=number_samples
     )
 
+@torch.compile
+def pdf_cdf_dist(projections: Distribution, R: Tensor):
+    pdf = torch.exp(projections.log_prob(R.transpose(0, 1))).transpose(0, 1)
+    cdf = projections.cdf(R.transpose(0, 1)).transpose(0, 1)
+    return torch.stack((pdf, cdf), dim=2)
 
 def gm_pdf_1d(x: Tensor, weights: Tensor, means: Tensor, stds: Tensor):
     """
