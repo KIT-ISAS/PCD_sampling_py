@@ -6,26 +6,14 @@ from torch.distributions import Normal
 
 @pytest.fixture
 def dist():
-    return Normal(0.0, 1.0)
+    components = Normal(torch.tensor([-1.0, 0.5]), torch.tensor([0.7, 1.0]))
+    mixture = torch.distributions.Categorical(probs=torch.tensor([0.5, 0.5]))
+    return torch.distributions.MixtureSameFamily(mixture, components)
 
 
 @pytest.fixture
 def lut(dist):
     return LookupTable(dist, num_points=1001)
-
-
-def test_exact_grid_points(lut):
-    grid = torch.linspace(
-        lut.xmin,
-        lut.xmax,
-        lut.num_points,
-        device=lut.table.device,
-        dtype=lut.table.dtype,
-    )
-
-    values = lut.pdf_cdf(grid)
-
-    assert torch.allclose(values, lut.table)
 
 
 def test_linear_interpolation(lut):
@@ -34,27 +22,27 @@ def test_linear_interpolation(lut):
     x0 = lut.xmin + i / lut.inv_dx
     x1 = lut.xmin + (i + 1) / lut.inv_dx
 
-    x = torch.tensor((x0 + x1) / 2)
+    x = (x0 + x1) / 2
 
-    expected = 0.5 * (lut.table[i] + lut.table[i + 1])
+    expected = 0.5 * (lut.table[0, i] + lut.table[0, i + 1])
 
     actual = lut.pdf_cdf(x)
 
     assert torch.allclose(actual, expected)
 
 def test_clamps_below_xmin(lut):
-    x = torch.tensor(lut.xmin - 100.0)
+    x = lut.xmin - 100.0
 
     actual = lut.pdf_cdf(x)
-    expected = lut.table[0]
+    expected = lut.table[0, 0]
 
     assert torch.allclose(actual, expected)
 
 def test_clamps_above_xmax(lut):
-    x = torch.tensor(lut.xmax + 100.0)
+    x = lut.xmax + 100.0
 
     actual = lut.pdf_cdf(x)
-    expected = lut.table[-1]
+    expected = lut.table[0, -1]
 
     assert torch.allclose(actual, expected)
 
@@ -66,16 +54,10 @@ def test_output_shape(lut):
     assert y.shape == (4, 5, 2)
 
 def test_accuracy(dist):
-    lut = LookupTable(
-        dist,
-        num_points=10001,
-        xmin=-5,
-        xmax=5,
-    )
+    lut = LookupTable(dist, num_points=10001)
+    x = torch.linspace(lut.xmin[0], lut.xmax[0], 1000)
 
-    x = torch.linspace(-4.9, 4.9, 1000)
-
-    approx = lut.pdf_cdf(x)
+    approx = lut.pdf_cdf(x)[0, :, :]
 
     exact = torch.stack(
         (

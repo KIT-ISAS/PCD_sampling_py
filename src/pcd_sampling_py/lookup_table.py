@@ -25,23 +25,22 @@ class LookupTable(torch.nn.Module):
         self,
         dist: Distribution,
         num_points,
-        xmin=None,
-        xmax=None,
+        xmin: Tensor = None,
+        xmax: Tensor = None,
         nsigma=3.0,
     ):
         super().__init__()
 
         if xmin is None:
             xmin = dist.mean - nsigma * dist.stddev
-        self.xmin = xmin
+        self.xmin = torch.atleast_1d(xmin)
 
         if xmax is None:
             xmax = dist.mean + nsigma * dist.stddev
-        self.xmax = xmax
+        self.xmax = torch.atleast_1d(xmax)
 
-        
         t = torch.linspace(0, 1, num_points, device=dist.mean.device, dtype=dist.mean.dtype)
-        grid = xmin[:, None] + (xmax - xmin)[:, None] * t
+        grid = self.xmin[:, None] + (self.xmax - self.xmin)[:, None] * t
         table = pdf_cdf_dist(dist, grid)
         self.register_buffer("table", table)
         
