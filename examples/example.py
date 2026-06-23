@@ -32,7 +32,6 @@ def sample():
     torch.manual_seed(4)
     # unit_vectors = sample_unit_vectors(10, 2, device=means.device, dtype=means.dtype).double()
 
-    sum_time = 0.0
     last_samples = None
 
     # sampling_config = PCDSamplerConfig(
@@ -41,7 +40,6 @@ def sample():
     #     number_unit_vectors=2000,
     #     steps=28,
     #     # threshold=1e-6,
-    #     sorting=True,
     #     initial_sampling_method="random",
     #     unit_vectors_method="random",
     # )
@@ -52,13 +50,12 @@ def sample():
         number_samples=200,
         dim=2,
         number_unit_vectors=100,
-        steps=100,
+        steps=20,
         # threshold=1e-6,
-        sorting=True,
         initial_sampling_method="random",
         unit_vectors_method="deterministic",
-        lookup_table = False,
-        local_update=False,
+        lookup_table=True,
+        local_update=True,
     )
     sampler = PCDSampler(sampling_config)
 

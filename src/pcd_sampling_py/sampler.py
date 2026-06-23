@@ -5,7 +5,6 @@ from torch.distributions import Normal
 from pcd_sampling_py.models import PCDSamplerConfig
 from pcd_sampling_py.lookup_table import LookupTable, pdf_cdf_lut
 from pcd_sampling_py.sampling_utils import (
-    heaviside_mean,
     sample_gm,
     sot_sphere,
     pdf_cdf_dist
@@ -31,40 +30,16 @@ class PCDSampler:
         self.threshold = config.threshold
         self.dim = config.dim
         self.steps = config.steps
-        self.sorting = config.sorting
         self.lookup_table = config.lookup_table
         self.local_update = config.local_update
         self.initial_sampling_method = config.initial_sampling_method
         self.unit_vectors_method = config.unit_vectors_method
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-        self.alpha_max = 2
-        self.alpha_min = 0.01
-
-        # Batch functions for calculating gain.
-        self._delta_r_vmap = torch.func.vmap(
-            self.calculate_delta_r, in_dims=(0, None, 0, 0)
-        )
-        self._delta_x_vmap = torch.func.vmap(
-            self.calculate_delta_x, in_dims=(0, 0, 0, 0)
-        )
-        self._delta_r_sorted_vmap = torch.func.vmap(
-            self.calculate_delta_r_sorted, in_dims=(0, 0, 0)
-        )
-        self._delta_x_sorted_vmap = torch.func.vmap(
-            self.calculate_delta_x_sorted, in_dims=(0, 0, 0, 0)
-        )
-
         if self.lookup_table:
             self.pdf_cdf: Callable = pdf_cdf_lut       
         else:
             self.pdf_cdf: Callable = pdf_cdf_dist
-
-        # If sorting of the projections is enabled use the correct impelementation
-        if self.sorting:
-            self.compute_delta_x: Callable = self._delta_x_sorted_vmap
-        else:
-            self.compute_delta_x: Callable = self._delta_x_vmap
 
         self.numbers = torch.arange(0, self.number_samples, device=self.device)
 
@@ -103,119 +78,24 @@ class PCDSampler:
             device=self.device,
         )
 
-    @torch.compile
-    def calculate_delta_r(
-        self, x: Tensor, r: Tensor, f_tilda: Tensor, F_tilda: Tensor
-    ):
-        """
-        This function is used to compute the gain between real and approximation projected distributions
-
-        :param x: scalar
-        :param r: (L, ) all projections of samples onto the unit vector.
-        :param weights: (T, ) weigths of the components of the projections of the real GM
-        :param means: (T, )
-        :param stds: (T, T)
-
-        L - number of samples, T - number of components in GM
-        """
-
-        F = heaviside_mean(x, r)
-
-        eps = 1e-3  # to avoid division by zero.
-        return -((F_tilda - F) / torch.clamp(f_tilda, min=eps))
-
-    @torch.compile
-    def calculate_delta_r_sorted(
-        self, i: Tensor, f_tilda: Tensor, F_tilda: Tensor
-    ):
-        """
-        This function is used to compute the gain between real and approximation projected distributions for sorted projections.
-
-        :param x: scalar
-        :param i: index of the sample in the sorted projection
-        :param weights: (T, ) weigths of the components of the projections of the real GM
-        :param means: (T, )
-        :param stds: (T, T)
-
-        L - number of samples, T - number of components in GM
-        """
-
-        eps = 1e-3  # to avoid division by zero.
-        return -(
-            (F_tilda - (2 * i - 1) / 2 / self.number_samples)
-            / torch.clamp(f_tilda, min=eps)
-        )
-
-    @torch.compile
-    def calculate_delta_x(
-        self, r: Tensor, u: Tensor, pdf: Tensor, cdf: Tensor
-    ):
-        """
-        This function is used to compute the gain for all samples with respect to the provided unit vector.
-
-        :param r: projections of all samples onto the provided unit vector
-        :param u: unit vector
-        :param means: projected means of the original GM.
-        :param stds: projection stds of the original GM.
-        :param weights: weights of the original GM.
-        """
-        delta_r = self._delta_r_vmap(r, r, pdf, cdf)
-        delta_x = (u[None, :] * delta_r[:, None]) / self.number_unit_vectors
-
-        return delta_x
-
-    @torch.compile
-    def calculate_delta_x_sorted(
-        self, r: Tensor, u: Tensor, pdf: Tensor, cdf: Tensor
-    ):
-        """
-        This function is used to compute the gain for all samples with respect to the provided unit vector.
-        It first sorts the projections for the unit vector
-
-        :param r: projections of all samples onto the provided unit vector
-        :param u: unit vector
-        :param means: projected means of the original GM.
-        :param stds: projection stds of the original GM.
-        :param weights: weights of the original GM.
-        """
-
-        _, idx = torch.sort(r)
-        delta_r_sorted = self._delta_r_sorted_vmap(
-            self.numbers, pdf[idx], cdf[idx]
-        )
-
-        # Returning to the original order
-        delta_r_original = delta_r_sorted[torch.argsort(idx)]
-        delta_x = (u[None, :] * delta_r_original[:, None]) / self.number_unit_vectors
-        return delta_x
-    
-    def _calculate_gain(self, step, X, projections):
-        coef = (
-            self.alpha_min * step / self.steps
-            + self.alpha_max * (self.steps - step) / self.steps
-        )
-
+    def _calculate_gain(self, X, projections):
         # Calculate projections onto unit vectors before hand
         R = self.unit_vectors @ X.T  # -> (K, L)
-
+        ranks = torch.argsort(torch.argsort(R))
+        
         pdf, cdf = self.pdf_cdf(projections, R).unbind(dim=-1)
 
         # Calculate the gain for the samples based on the differences between projections of real and approximate distributions
-        delta_x: Tensor = self.compute_delta_x(
-            R, self.unit_vectors, pdf, cdf
-        ).sum(
-            dim=0
-        )  # -> (L, N)
-
-        return coef, delta_x
+        delta_x = torch.einsum('ki,kj->ij', -(cdf - (2 * ranks - 1) / 2 / self.number_samples) / torch.clamp(pdf, 1e-3), self.unit_vectors)
+        return delta_x / self.number_unit_vectors
     
     def _calculate_gain_newton(self, X, projections):
         # Calculate projections onto unit vectors before hand
         R = self.unit_vectors @ X.T  # -> (K, L)
 
         pdf, cdf = self.pdf_cdf(projections, R).unbind(dim=-1)
-        _, idx = torch.sort(R)
-        ranks = torch.argsort(idx)
+        
+        ranks = torch.argsort(torch.argsort(R))
 
         G = torch.einsum('ki,kj->ij', cdf - (2 * ranks - 1) / 2 / self.number_samples, self.unit_vectors)
         outer = self.unit_vectors[:, :, None] * self.unit_vectors[:, None, :]   # (100, 2, 2)
@@ -223,7 +103,9 @@ class PCDSampler:
         
         delta_x = -torch.linalg.solve(H, G)
 
-        # Returning to the original order
+        # LU, pivots = torch.linalg.lu_factor(H)
+        # delta_x = -torch.linalg.lu_solve(LU, pivots, G.unsqueeze(-1)).squeeze(-1)
+
         return delta_x
 
     def _calculate_projections(self, means, covariances):
@@ -290,14 +172,11 @@ class PCDSampler:
         # 3. Start the minimization loop
         for _ in range(self.steps):
             if self.local_update:
-                coef, delta_x = self._calculate_gain(
-                    _, X, projections
-                )
+                delta_x = self._calculate_gain(X, projections)
             else:
-                coef = 1
                 delta_x = self._calculate_gain_newton(X, projections)
             
-            X += coef * delta_x
+            X += delta_x
         return X
 
     @torch.compile
@@ -315,20 +194,33 @@ class PCDSampler:
         """
 
         # 1. Create projections of the original GM onto the unit vectors.
-        projected_means, projected_stds = self._calculate_projections(
-            means, covariances
-        )
+        components = self._calculate_projections(means, covariances)
+        mixture = torch.distributions.Categorical(probs=weights.reshape(1, -1).expand(self.number_unit_vectors, -1))
+        projections = torch.distributions.MixtureSameFamily(mixture, components)
+
+        if self.lookup_table:
+            projections = LookupTable(projections, 300)
 
         # 2. Create some random starting samples from the provided GM
         X = self._initial_samples(weights, means, covariances)
 
         # 3. Start the minimization loop
         for _ in range(self.steps):
-
-            coef, delta_x = self._calculate_gain(
-                _, X, projected_means, projected_stds, weights
-            )
-            X += coef * delta_x
+            if self.local_update:
+                delta_x = self._calculate_gain(X, projections)
+            else:
+                delta_x = self._calculate_gain_newton(X, projections)
+            
+            X += delta_x
+    
+        # 3. Start the minimization loop
+        for _ in range(self.steps):
+            if self.local_update:
+                delta_x = self._calculate_gain(X, projections)
+            else:
+                delta_x = self._calculate_gain_newton(X, projections)
+            
+            X += delta_x
 
             if torch.linalg.vector_norm(delta_x, dim=1).mean() < self.threshold:
                 return X
@@ -336,10 +228,13 @@ class PCDSampler:
         return X
 
     def benchmark_steps(self, weights: Tensor, means: Tensor, covariances: Tensor):
-        # 1. Create projections of the original GM onto the unit vectors.
-        projected_means, projected_stds = self._calculate_projections(
-            means, covariances
-        )
+       # 1. Create projections of the original GM onto the unit vectors.
+        components = self._calculate_projections(means, covariances)
+        mixture = torch.distributions.Categorical(probs=weights.reshape(1, -1).expand(self.number_unit_vectors, -1))
+        projections = torch.distributions.MixtureSameFamily(mixture, components)
+
+        if self.lookup_table:
+            projections = LookupTable(projections, 300)
 
         # 2. Create some random starting samples from the provided GM
         X = self._initial_samples(weights, means, covariances)
@@ -349,11 +244,12 @@ class PCDSampler:
 
         # 3. Start the minimization loop
         for _ in range(self.steps):
-
-            coef, delta_x = self._calculate_gain(
-                _, X, projected_means, projected_stds, weights
-            )
-            X += coef * delta_x
+            if self.local_update:
+                delta_x = self._calculate_gain(X, projections)
+            else:
+                delta_x = self._calculate_gain_newton(X, projections)
+            
+            X += delta_x
             norms[_] = torch.linalg.vector_norm(delta_x, dim=1).mean()
 
         return norms

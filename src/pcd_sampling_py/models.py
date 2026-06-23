@@ -13,7 +13,6 @@ class PCDSamplerConfig:
     number_samples: int
     threshold: float = 0.1
     steps: int = 40
-    sorting: bool = True
     lookup_table: bool = True
     local_update: bool = True
    
